@@ -1,0 +1,46 @@
+{
+  "name": "virtual-stem-platform",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "optimize:models": "node scripts/optimize-models.mjs"
+  },
+  "dependencies": {
+    "@react-three/drei": "^10.7.8",
+    "@react-three/fiber": "^9.7.0",
+    "@types/katex": "^0.16.8",
+    "framer-motion": "^12.23.12",
+    "gsap": "^3.15.0",
+    "jsdom": "^30.0.1",
+    "katex": "^0.18.4",
+    "lenis": "^1.3.26",
+    "lucide-react": "^1.30.0",
+    "next": "^15.5.23",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "three": "^0.185.1",
+    "zustand": "^5.0.14"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.6",
+    "@gltf-transform/cli": "^4.4.2",
+    "@gltf-transform/core": "^4.4.2",
+    "@gltf-transform/extensions": "^4.4.2",
+    "@gltf-transform/functions": "^4.4.2",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/three": "^0.185.0",
+    "eslint": "^9",
+    "eslint-config-next": "^15.5.23",
+    "meshoptimizer": "^1.0.1",
+    "sharp": "^0.34.5",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

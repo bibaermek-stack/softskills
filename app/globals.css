@@ -1,0 +1,473 @@
+@import "tailwindcss";
+@import "katex/dist/katex.min.css";
+
+/*
+  Dark mode is scoped to whatever element carries `data-theme="dark"` rather
+  than to <html>. The dashboard sets it on its own root, so toggling the theme
+  there never leaks into the marketing site, which is light-only by design.
+*/
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ------------------------------------------------------------------ *\
+   Design tokens
+   The site runs a dark "experience" shell (hero + 3D books + footer)
+   against a light "document" body, so most colours come in a pair.
+\* ------------------------------------------------------------------ */
+@theme {
+  /* Neutrals */
+  --color-ink-950: #04060f;
+  --color-ink-900: #060b1a;
+  --color-ink-800: #0a1128;
+  --color-ink-700: #101b3d;
+  --color-ink-600: #1a2a5c;
+
+  --color-paper: #ffffff;
+  --color-paper-50: #f8fafd;
+  --color-paper-100: #f1f5fb;
+  --color-paper-200: #e6ecf7;
+  --color-paper-300: #d3dcec;
+
+  /* Brand */
+  --color-brand-50: #eef2ff;
+  --color-brand-100: #e0e7ff;
+  --color-brand-200: #c7d2fe;
+  --color-brand-300: #a5b4fc;
+  --color-brand-400: #818cf8;
+  --color-brand-500: #6366f1;
+  --color-brand-600: #4f46e5;
+  --color-brand-700: #4338ca;
+  --color-brand-800: #3730a3;
+  --color-brand-900: #262b7a;
+
+  --color-deep-500: #2563eb;
+  --color-deep-600: #1d4ed8;
+  --color-deep-700: #1e3a8a;
+  --color-deep-800: #16307a;
+
+  --color-violet-400: #a78bfa;
+  --color-violet-500: #8b5cf6;
+  --color-violet-600: #7c3aed;
+  --color-violet-700: #6d28d9;
+
+  --color-cyan-300: #67e8f9;
+  --color-cyan-400: #22d3ee;
+  --color-cyan-500: #06b6d4;
+
+  /* Typography — both faces ship Cyrillic (incl. cyrillic-ext) for Kazakh */
+  --font-display: var(--font-display-face), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  /* Fluid display scale */
+  --text-display-sm: clamp(1.9rem, 1.3rem + 2.6vw, 3rem);
+  --text-display: clamp(2.4rem, 1.3rem + 4.6vw, 4.6rem);
+  --text-display-lg: clamp(2.9rem, 1rem + 7.4vw, 6.75rem);
+
+  /* Easing */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out-soft: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* Shadows */
+  --shadow-soft: 0 1px 2px rgb(16 27 61 / 0.04), 0 12px 32px -12px rgb(16 27 61 / 0.14);
+  --shadow-lift: 0 2px 4px rgb(16 27 61 / 0.05), 0 28px 60px -24px rgb(16 27 61 / 0.26);
+  --shadow-glow: 0 0 0 1px rgb(99 102 241 / 0.14), 0 24px 70px -28px rgb(79 70 229 / 0.55);
+
+  /* Section rhythm */
+  --spacing-section: clamp(5rem, 3rem + 9vw, 9.5rem);
+}
+
+/* ------------------------------------------------------------------ *\
+   Dashboard theming
+
+   The marketing site is light-only. The dashboard ships a light/dark toggle,
+   so its `dark:` variant is bound to a `data-theme` attribute rather than the
+   OS preference — the attribute lives on the dashboard's own root element, and
+   the public pages therefore never pick these styles up.
+\* ------------------------------------------------------------------ */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ------------------------------------------------------------------ *\
+   Base
+\* ------------------------------------------------------------------ */
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  /* Lenis drives scrolling; native smooth scroll would fight it. */
+  html.lenis,
+  html.lenis body {
+    height: auto;
+  }
+  html.lenis {
+    scroll-behavior: auto;
+  }
+  .lenis.lenis-smooth [data-lenis-prevent] {
+    overscroll-behavior: contain;
+  }
+
+  body {
+    background-color: var(--color-paper);
+    color: var(--color-ink-900);
+    font-family: var(--font-sans);
+    font-synthesis-weight: none;
+    text-rendering: optimizeLegibility;
+    overflow-x: clip;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--color-brand-500) 28%, transparent);
+    color: var(--color-ink-950);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-brand-500);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: -0.028em;
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+}
+
+/* ------------------------------------------------------------------ *\
+   Utilities
+\* ------------------------------------------------------------------ */
+@utility container-x {
+  width: 100%;
+  margin-inline: auto;
+  max-width: 80rem;
+  padding-inline: clamp(1.15rem, 0.6rem + 2.6vw, 2.5rem);
+}
+
+@utility text-gradient {
+  background-image: linear-gradient(
+    100deg,
+    var(--color-deep-600) 0%,
+    var(--color-brand-600) 38%,
+    var(--color-violet-600) 68%,
+    var(--color-cyan-500) 100%
+  );
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+@utility text-gradient-light {
+  background-image: linear-gradient(
+    100deg,
+    #ffffff 0%,
+    var(--color-brand-200) 42%,
+    var(--color-cyan-300) 100%
+  );
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+/* Light-surface glass card */
+@utility glass {
+  background: color-mix(in srgb, #ffffff 72%, transparent);
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  border: 1px solid color-mix(in srgb, var(--color-ink-700) 8%, transparent);
+}
+
+/* Dark-surface glass card */
+@utility glass-dark {
+  background: color-mix(in srgb, #ffffff 6%, transparent);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  border: 1px solid color-mix(in srgb, #ffffff 12%, transparent);
+}
+
+@utility ring-hairline {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-ink-700) 9%, transparent);
+}
+
+/* Fine grid used as a background texture on dark sections */
+@utility bg-grid {
+  background-image:
+    linear-gradient(to right, color-mix(in srgb, #ffffff 4%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, #ffffff 4%, transparent) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+
+/* ------------------------------------------------------------------ *\
+   Dashboard surfaces
+
+   The schematic the dashboard reproduces is built from tinted, rounded panels
+   on a near-white field. These utilities carry that surface in both themes so
+   individual components stay declarative.
+\* ------------------------------------------------------------------ */
+
+/* Card surface used by every panel in the dashboard grid. */
+@utility dash-panel {
+  background: color-mix(in srgb, #ffffff 78%, transparent);
+  backdrop-filter: blur(18px) saturate(1.4);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  border: 1px solid color-mix(in srgb, var(--color-ink-700) 9%, transparent);
+  box-shadow: var(--shadow-soft);
+}
+
+[data-theme="dark"] .dash-panel {
+  background: color-mix(in srgb, #ffffff 5%, transparent);
+  border-color: color-mix(in srgb, #ffffff 11%, transparent);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 18px 44px -20px rgb(0 0 0 / 0.7);
+}
+
+/* Section header bar — the dark blue ribbons in the schematic. */
+@utility dash-ribbon {
+  background-image: linear-gradient(
+    100deg,
+    var(--color-deep-700) 0%,
+    var(--color-brand-700) 55%,
+    var(--color-violet-700) 100%
+  );
+  color: #ffffff;
+}
+
+/* The soft aurora wash sitting behind the whole dashboard. */
+@utility dash-field {
+  background:
+    radial-gradient(60rem 32rem at 12% -8%, color-mix(in srgb, var(--color-brand-500) 16%, transparent), transparent 70%),
+    radial-gradient(52rem 30rem at 92% 4%, color-mix(in srgb, var(--color-violet-500) 14%, transparent), transparent 70%),
+    radial-gradient(48rem 28rem at 50% 108%, color-mix(in srgb, var(--color-cyan-400) 12%, transparent), transparent 72%),
+    var(--color-paper-50);
+}
+
+[data-theme="dark"] .dash-field {
+  background:
+    radial-gradient(60rem 32rem at 12% -8%, color-mix(in srgb, var(--color-brand-500) 26%, transparent), transparent 70%),
+    radial-gradient(52rem 30rem at 92% 4%, color-mix(in srgb, var(--color-violet-600) 24%, transparent), transparent 70%),
+    radial-gradient(48rem 28rem at 50% 108%, color-mix(in srgb, var(--color-cyan-500) 16%, transparent), transparent 72%),
+    var(--color-ink-950);
+}
+
+@utility bg-grid-light {
+  background-image:
+    linear-gradient(to right, color-mix(in srgb, var(--color-ink-700) 5%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--color-ink-700) 5%, transparent) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+
+/* ------------------------------------------------------------------ *\
+   Dashboard surfaces
+   The dashboard reproduces the project's architecture diagram, so it needs a
+   card language that survives both themes without restating colours at every
+   call site.
+\* ------------------------------------------------------------------ */
+
+/* Frosted card used for every block of the dashboard grid. */
+@utility dash-card {
+  background: color-mix(in srgb, #ffffff 78%, transparent);
+  backdrop-filter: blur(18px) saturate(1.4);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  border: 1px solid color-mix(in srgb, var(--color-ink-700) 9%, transparent);
+  box-shadow: var(--shadow-soft);
+}
+
+[data-theme="dark"] .dash-card {
+  background: color-mix(in srgb, #ffffff 5%, transparent);
+  border-color: color-mix(in srgb, #ffffff 11%, transparent);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 18px 44px -20px rgb(0 0 0 / 0.7);
+}
+
+/* Section banner — the coloured strip that titles each zone in the diagram. */
+@utility dash-banner {
+  background-image: linear-gradient(
+    100deg,
+    var(--color-deep-700) 0%,
+    var(--color-brand-700) 52%,
+    var(--color-violet-700) 100%
+  );
+  color: #ffffff;
+}
+
+/* Page backdrop: white with a soft blue/violet wash, per the brief. */
+@utility dash-backdrop {
+  background:
+    radial-gradient(60rem 40rem at 12% -8%, rgb(37 99 235 / 0.1), transparent 62%),
+    radial-gradient(52rem 38rem at 92% 4%, rgb(124 58 237 / 0.09), transparent 60%),
+    var(--color-paper-50);
+}
+
+[data-theme="dark"] .dash-backdrop {
+  background:
+    radial-gradient(60rem 40rem at 12% -8%, rgb(37 99 235 / 0.22), transparent 62%),
+    radial-gradient(52rem 38rem at 92% 4%, rgb(124 58 237 / 0.2), transparent 60%),
+    var(--color-ink-950);
+}
+
+/* Panes that scroll independently of the page must not hand scroll to Lenis. */
+@utility dash-scroll {
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+/* ------------------------------------------------------------------ *\
+   Keyframes
+\* ------------------------------------------------------------------ */
+@keyframes aurora-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  33% {
+    transform: translate3d(4%, -6%, 0) scale(1.12);
+  }
+  66% {
+    transform: translate3d(-5%, 4%, 0) scale(0.94);
+  }
+}
+
+@keyframes float-y {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-14px);
+  }
+}
+
+@keyframes sheen {
+  from {
+    background-position: -220% 0;
+  }
+  to {
+    background-position: 220% 0;
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.82);
+    opacity: 0.55;
+  }
+  70% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes scroll-hint {
+  0% {
+    transform: translateY(-40%);
+    opacity: 0;
+  }
+  35% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(150%);
+    opacity: 0;
+  }
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes dash-flow {
+  to {
+    stroke-dashoffset: -1000;
+  }
+}
+
+@keyframes drift-particle {
+  0% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(var(--dx, 30px), var(--dy, -110px), 0);
+    opacity: 0;
+  }
+}
+
+@keyframes flow-dash {
+  to {
+    stroke-dashoffset: -220;
+  }
+}
+
+.animate-drift-particle {
+  animation: drift-particle var(--dur, 14s) linear infinite;
+  animation-delay: var(--delay, 0s);
+}
+.animate-flow-dash {
+  animation: flow-dash 3.2s linear infinite;
+}
+.animate-aurora {
+  animation: aurora-drift 26s var(--ease-in-out-soft) infinite;
+}
+.animate-float-y {
+  animation: float-y 7s var(--ease-in-out-soft) infinite;
+}
+.animate-marquee {
+  animation: marquee 42s linear infinite;
+}
+.animate-scroll-hint {
+  animation: scroll-hint 2.1s var(--ease-in-out-soft) infinite;
+}
+
+/* ------------------------------------------------------------------ *\
+   Reduced motion — kill decorative animation, keep content visible
+\* ------------------------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Scrollbar */
+@media (min-width: 768px) {
+  ::-webkit-scrollbar {
+    width: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--color-paper-100);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--color-brand-600) 42%, var(--color-paper-300));
+    border-radius: 999px;
+    border: 3px solid var(--color-paper-100);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-brand-600);
+  }
+}

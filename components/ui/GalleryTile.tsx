@@ -57,14 +57,25 @@ export function GalleryTile({
       )}
     >
       {image ? (
-        <div className="absolute inset-0 flex size-full items-center justify-center bg-ink-950 p-1.5">
+        <div className="absolute inset-0 flex size-full items-center justify-center overflow-hidden bg-ink-950 p-3 pb-12">
+          {/* Blurred backdrop image to eliminate harsh empty bars */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={image}
+            alt=""
+            aria-hidden
+            className="pointer-events-none absolute inset-0 size-full object-cover blur-2xl opacity-45 scale-120"
+          />
+          {/* Main image */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={image}
             alt={caption ? `${title} — ${caption}` : title}
             className={cn(
-              "size-full transition-transform duration-700 ease-(--ease-out-expo)",
-              fit === "contain" ? "object-contain" : "object-cover",
+              "relative z-10 transition-transform duration-700 ease-(--ease-out-expo)",
+              fit === "contain"
+                ? "max-h-full max-w-full object-contain rounded-lg drop-shadow-2xl"
+                : "size-full object-cover",
               interactive && "group-hover:scale-105",
             )}
           />

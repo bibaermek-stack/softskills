@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
@@ -9,9 +9,68 @@ import { useDashboard } from "@/lib/dashboardStore";
 import { usePrefersReducedMotion } from "@/lib/hooks";
 import { Icon } from "./Icon";
 
+import { useAuthStore } from "@/lib/authStore";
+import { signOut } from "@/lib/supabase/accounts";
+
 /** Навигация сілтемелерінің ортақ көрінісі. */
 const NAV_ITEM_CLASS =
   "flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/8 px-3 py-2 text-[0.76rem] font-medium whitespace-nowrap text-white/90 transition hover:border-white/35 hover:bg-white/18 hover:text-white aria-[current=page]:border-white/45 aria-[current=page]:bg-white/20 aria-[current=page]:text-white";
+
+function HeaderUserControl() {
+  const user = useAuthStore((s) => s.user);
+  const setUser = useAuthStore((s) => s.setUser);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const handleSignOut = async () => {
+    await signOut();
+    setUser(null);
+  };
+
+  const handleOpenAuth = () => {
+    window.dispatchEvent(new CustomEvent("open-auth-modal"));
+  };
+
+  if (!mounted || !user) {
+    return (
+      <button
+        type="button"
+        onClick={handleOpenAuth}
+        className="flex items-center gap-2 rounded-xl border border-brand-400/50 bg-brand-500/25 px-3.5 py-2 text-[0.78rem] font-bold text-brand-200 transition hover:bg-brand-500/40 hover:border-brand-300 shadow-lg cursor-pointer"
+      >
+        <Icon name="User" className="size-4 text-brand-300" />
+        <span>Кіру / Тіркелу</span>
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2.5 rounded-xl border border-white/15 bg-white/10 px-3 py-1.5 text-xs text-white">
+      <div className="flex items-center gap-2">
+        <div className="flex size-7 items-center justify-center rounded-full bg-brand-500 font-bold text-white text-[0.72rem]">
+          {user.fullName ? user.fullName[0].toUpperCase() : "U"}
+        </div>
+        <div className="hidden md:block text-left">
+          <p className="font-semibold leading-none text-[0.78rem]">{user.fullName}</p>
+          <p className="mt-0.5 text-[0.65rem] text-brand-200">
+            {user.role === "teacher" ? "👨‍🏫 Оқытушы" : "🎓 Студент"} {user.userCode ? `(${user.userCode})` : ""}
+          </p>
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={handleSignOut}
+        className="rounded-lg bg-white/10 px-2 py-1 text-[0.68rem] font-medium text-slate-300 hover:bg-red-500/20 hover:text-red-200 transition"
+        title="Жүйеден шығу"
+      >
+        Шығу
+      </button>
+    </div>
+  );
+}
 
 /**
  * Схеманың жоғарғы жолағы: атау, қосымша тақырып және навигация.
@@ -150,11 +209,8 @@ export function DashHeader() {
               </kbd>
             </button>
 
-            {/* LocalStorage No-Registration Badge */}
-            <div className="hidden xl:flex items-center gap-1.5 rounded-xl border border-amber-400/30 bg-amber-500/10 px-2.5 py-1.5 text-[0.68rem] font-semibold text-amber-200" title="Барлық деректер құрылғыда сақталады">
-              <span className="size-2 rounded-full bg-amber-400 animate-ping" />
-              💾 Тіркелусіз (localStorage)
-            </div>
+            {/* Auth status & trigger */}
+            <HeaderUserControl />
 
             <button
               type="button"

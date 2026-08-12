@@ -44,7 +44,7 @@ function LessonCards() {
             key={lesson.id}
             initial={reduced ? false : { opacity: 0, y: 18 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "0px 0px -8% 0px" }}
+            viewport={{ once: true, amount: 0.01 }}
             transition={{ duration: 0.5, delay: reduced ? 0 : i * 0.06, ease: [0.16, 1, 0.3, 1] }}
             whileHover={reduced ? undefined : { y: -4 }}
           >

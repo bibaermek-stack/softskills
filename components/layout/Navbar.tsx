@@ -92,12 +92,12 @@ export function Navbar() {
             {navLinks.map((link) => {
               const isActive = active === link.href;
               return (
-                <li key={link.href}>
+                <li key={link.href} className="shrink-0">
                   <a
                     href={link.href}
                     aria-current={isActive ? "true" : undefined}
                     className={cn(
-                      "relative rounded-full px-3.5 py-2 text-[0.82rem] font-medium transition-colors duration-300",
+                      "relative inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-2 text-[0.82rem] font-medium transition-colors duration-300 xl:px-3.5",
                       scrolled
                         ? isActive
                           ? "text-brand-700"
@@ -129,7 +129,7 @@ export function Navbar() {
             <Link
               href="/dashboard"
               className={cn(
-                "hidden items-center gap-1.5 rounded-full px-4 py-2.5 text-[0.82rem] font-semibold transition-all duration-300 sm:inline-flex",
+                "hidden shrink-0 whitespace-nowrap items-center gap-1.5 rounded-full px-4 py-2.5 text-[0.82rem] font-semibold transition-all duration-300 sm:inline-flex",
                 scrolled
                   ? "bg-brand-50 text-brand-700 hover:bg-brand-100"
                   : "bg-white/10 text-white ring-1 ring-white/20 hover:bg-white/20",
@@ -149,7 +149,7 @@ export function Navbar() {
             <a
               href="#contact"
               className={cn(
-                "hidden rounded-full px-5 py-2.5 text-[0.82rem] font-semibold transition-all duration-300 sm:inline-flex",
+                "hidden shrink-0 whitespace-nowrap rounded-full px-5 py-2.5 text-[0.82rem] font-semibold transition-all duration-300 sm:inline-flex",
                 scrolled
                   ? "bg-ink-900 text-white hover:bg-brand-700"
                   : "bg-white text-ink-900 hover:bg-brand-100",

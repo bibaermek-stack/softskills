@@ -2,27 +2,48 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { useDashboard, readStoredTheme } from "@/lib/dashboardStore";
+import { useAuthStore } from "@/lib/authStore";
 import { DashHeader } from "./DashHeader";
 import { AiTutorWidget } from "@/components/ui/AiTutorWidget";
 import { GlobalSearchModal } from "@/components/ui/GlobalSearchModal";
 import { ClassroomPresenterModal } from "@/components/ui/ClassroomPresenterModal";
+import { AuthModal } from "@/components/ui/AuthModal";
+import { AuthProvider } from "@/components/providers/AuthProvider";
 
-export function DashThemeShell({ children }: { children: ReactNode }) {
+function DashShellInner({ children }: { children: ReactNode }) {
   const theme = useDashboard((s) => s.theme);
   const setTheme = useDashboard((s) => s.setTheme);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const user = useAuthStore((s) => s.user);
+  const loading = useAuthStore((s) => s.loading);
 
-  // Сақталған теманы бір рет қалпына келтіру.
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
   useEffect(() => {
+    setMounted(true);
     setTheme(readStoredTheme());
   }, [setTheme]);
 
-  // Global search listener
   useEffect(() => {
     const handleOpenSearch = () => setIsSearchOpen(true);
+    const handleOpenAuth = () => setIsAuthOpen(true);
+
     window.addEventListener("open-global-search", handleOpenSearch);
-    return () => window.removeEventListener("open-global-search", handleOpenSearch);
+    window.addEventListener("open-auth-modal", handleOpenAuth);
+
+    return () => {
+      window.removeEventListener("open-global-search", handleOpenSearch);
+      window.removeEventListener("open-auth-modal", handleOpenAuth);
+    };
   }, []);
+
+  // Auto prompt Auth modal if unauthenticated after initial load check
+  useEffect(() => {
+    if (mounted && !loading && !user) {
+      setIsAuthOpen(true);
+    }
+  }, [mounted, loading, user]);
 
   return (
     <div data-theme={theme} className="dash-backdrop min-h-screen relative">
@@ -35,11 +56,21 @@ export function DashThemeShell({ children }: { children: ReactNode }) {
       <AiTutorWidget />
 
       {/* Global Search Modal */}
-      <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+      <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsAuthOpen(false)} />
 
       {/* Classroom Interactive Presenter Mode Modal */}
       <ClassroomPresenterModal />
+
+      {/* Auth Modal (Login / Register / Google / Demo) */}
+      <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
     </div>
   );
 }
 
+export function DashThemeShell({ children }: { children: ReactNode }) {
+  return (
+    <AuthProvider>
+      <DashShellInner>{children}</DashShellInner>
+    </AuthProvider>
+  );
+}

@@ -62,7 +62,7 @@ export function OutcomesFooter() {
             className="group flex items-center gap-3 bg-linear-100 from-brand-700 to-violet-700 px-4 py-4"
             initial={reduced ? false : { opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "0px 0px -8% 0px" }}
+            viewport={{ once: true, amount: 0.01 }}
             transition={{ duration: 0.55, delay: reduced ? 0 : i * 0.08, ease: [0.16, 1, 0.3, 1] }}
           >
             <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white/15 text-white transition-transform duration-400 group-hover:scale-110">

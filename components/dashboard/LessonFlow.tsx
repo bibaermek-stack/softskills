@@ -46,7 +46,7 @@ export function LessonFlow() {
                 }}
                 initial={reduced ? false : { opacity: 0, y: 16 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "0px 0px -8% 0px" }}
+                viewport={{ once: true, amount: 0.01 }}
                 transition={{ duration: 0.45, delay: reduced ? 0 : i * 0.06 }}
                 whileHover={reduced ? undefined : { y: -3 }}
               >

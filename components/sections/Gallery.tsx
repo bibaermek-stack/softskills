@@ -10,9 +10,9 @@ import { usePrefersReducedMotion } from "@/lib/hooks";
 import { cn } from "@/lib/cn";
 
 const SPAN: Record<string, string> = {
-  tall: "sm:row-span-2 aspect-4/3 sm:aspect-auto",
-  wide: "sm:col-span-2 aspect-16/10",
-  normal: "aspect-4/3",
+  tall: "sm:row-span-2 min-h-[24rem] sm:min-h-0 h-full",
+  wide: "sm:col-span-2 min-h-[13rem] sm:min-h-0 h-full",
+  normal: "min-h-[13rem] sm:min-h-0 h-full",
 };
 
 export function Gallery() {
@@ -58,7 +58,7 @@ export function Gallery() {
           lead="Платформаның бес модулі бойынша қалыптасатын орталар мен нәтижелерге визуалды шолу."
         />
 
-        <div className="mt-14 grid auto-rows-[minmax(0,1fr)] grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-14 grid grid-flow-dense auto-rows-[13.5rem] grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {gallery.map((item, i) => (
             <Reveal
               key={item.title}

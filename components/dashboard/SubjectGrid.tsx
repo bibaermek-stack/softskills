@@ -50,7 +50,7 @@ export function SubjectGrid() {
             className="group flex flex-col overflow-hidden rounded-xl border border-ink-700/8 dark:border-white/10"
             initial={reduced ? false : { opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "0px 0px -8% 0px" }}
+            viewport={{ once: true, amount: 0.01 }}
             transition={{ duration: 0.55, delay: reduced ? 0 : i * 0.07, ease: [0.16, 1, 0.3, 1] }}
             whileHover={reduced ? undefined : { y: -5 }}
             style={{ backgroundColor: subject.tint }}

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Manrope } from "next/font/google";
 import "./globals.css";
+import "katex/dist/katex.min.css";
 import { site } from "@/lib/content";
 
 // The site is in Kazakh, so both faces must carry cyrillic-ext — that subset
@@ -77,8 +78,8 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="kk" className={`${inter.variable} ${manrope.variable} antialiased`}>
-      <body className="bg-paper text-ink-900">
+    <html lang="kk" suppressHydrationWarning className={`${inter.variable} ${manrope.variable} antialiased`}>
+      <body suppressHydrationWarning className="bg-paper text-ink-900">
         <script
           type="application/ld+json"
           // Static, author-controlled metadata — no user input reaches this.

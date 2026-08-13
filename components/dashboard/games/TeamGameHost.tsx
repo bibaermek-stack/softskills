@@ -119,6 +119,18 @@ export function TeamGameHost({ roomCode, onClose }: TeamGameHostProps) {
     })
     .sort((a, b) => b.score - a.score);
 
+  const handleCloseRoom = () => {
+    engine.broadcastState({ phase: "room_closed" });
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.removeItem(`team_game_room_${roomCode}`);
+      } catch {
+        // Ignore
+      }
+    }
+    onClose?.();
+  };
+
   return (
     <div className="mx-auto max-w-5xl rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900">
       {/* Header Bar */}
@@ -140,7 +152,7 @@ export function TeamGameHost({ roomCode, onClose }: TeamGameHostProps) {
         {onClose && (
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleCloseRoom}
             className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
           >
             <Icon name="X" className="size-4" />

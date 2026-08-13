@@ -6,7 +6,8 @@ export type GamePhase =
   | "question"
   | "reveal"
   | "leaderboard"
-  | "game_over";
+  | "game_over"
+  | "room_closed";
 
 export interface Team {
   id: TeamId;

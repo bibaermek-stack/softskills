@@ -348,6 +348,35 @@ export function TeamGamePlayer({ initialRoomCode = "", onExit }: TeamGamePlayerP
           )}
         </div>
       )}
+
+      {/* ROOM CLOSED PHASE */}
+      {gameState?.phase === "room_closed" && (
+        <div className="py-8 text-center">
+          <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-red-100 text-3xl dark:bg-red-950/60">
+            ⚠️
+          </div>
+          <h4 className="mt-3 font-display text-base font-bold text-slate-900 dark:text-white">
+            Бөлме Жабылды!
+          </h4>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            Ұйымдастырушы (Host) бөлмені жапты. Ойын аяқталды.
+          </p>
+
+          <button
+            type="button"
+            onClick={() => {
+              setJoined(false);
+              setEngine(null);
+              setGameState(null);
+              onExit?.();
+            }}
+            className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 py-3 text-xs font-bold text-white shadow-lg transition hover:bg-red-700"
+          >
+            <Icon name="ArrowLeft" className="size-4" />
+            Бөлмеден Шығу
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -535,34 +535,34 @@ export function TeamGameHost({ roomCode, initialQuestions, onClose }: TeamGameHo
 
           {/* Podium */}
           <div className="mt-8 flex w-full max-w-xl items-end justify-center gap-4">
-            {sortedTeams.slice(0, 3).map((team, idx) => {
-              const heights = ["h-44", "h-36", "h-28"];
-              const medals = ["🥇 1-орын", "🥈 2-орын", "🥉 3-орын"];
-              const order = [1, 0, 2]; // Center top team
-              const currentTeam = sortedTeams[order[idx]];
-
+            {[1, 0, 2].map((rankIndex) => {
+              const currentTeam = sortedTeams[rankIndex];
               if (!currentTeam) return null;
+
+              const rank = rankIndex + 1;
+              const heightClass = rank === 1 ? "h-52 border-2" : rank === 2 ? "h-44" : "h-36";
+              const medals = ["🥇 1-орын", "🥈 2-орын", "🥉 3-орын"];
 
               return (
                 <div
                   key={currentTeam.id}
-                  className={`flex flex-1 flex-col items-center rounded-2xl border p-4 ${heights[idx]} justify-between shadow-lg`}
+                  className={`flex flex-1 flex-col items-center rounded-2xl p-4 ${heightClass} justify-between shadow-lg transition-transform hover:scale-105`}
                   style={{
                     borderColor: currentTeam.color,
-                    backgroundColor: `${currentTeam.color}15`,
+                    backgroundColor: rank === 1 ? `${currentTeam.color}25` : `${currentTeam.color}15`,
                   }}
                 >
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
-                    {medals[order[idx]]}
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                    {medals[rankIndex]}
                   </span>
                   <div className="flex flex-col items-center">
-                    <span className="text-2xl">{currentTeam.badge}</span>
+                    <span className="text-3xl">{currentTeam.badge}</span>
                     <span className="mt-1 text-xs font-bold text-slate-900 dark:text-white">
                       {currentTeam.name}
                     </span>
                   </div>
                   <span
-                    className="rounded-full px-3 py-1 text-xs font-black text-white"
+                    className="rounded-full px-3.5 py-1 text-xs font-black text-white shadow-sm"
                     style={{ backgroundColor: currentTeam.color }}
                   >
                     {currentTeam.score} ұпай

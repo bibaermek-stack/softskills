@@ -34,6 +34,25 @@ export interface Player {
   joinedAt: number;
 }
 
+export type QuestionCategory =
+  | "Барлығы"
+  | "Физика"
+  | "Химия"
+  | "Биология"
+  | "Математика"
+  | "STEM & Робототехника";
+
+export const CATEGORIES: QuestionCategory[] = [
+  "Барлығы",
+  "Физика",
+  "Химия",
+  "Биология",
+  "Математика",
+  "STEM & Робототехника",
+];
+
+export const REACTION_EMOJIS = ["👏", "🚀", "🔥", "💡", "🎉", "💯", "⭐"];
+
 export interface STEMQuestion {
   id: string;
   category: "Физика" | "Химия" | "Биология" | "Математика" | "STEM & Робототехника";
@@ -43,6 +62,24 @@ export interface STEMQuestion {
   explanation: string;
   timeLimit: number; // seconds
   points: number;
+}
+
+export function calculatePointsWithSpeedBonus(
+  basePoints: number,
+  remainingSeconds: number,
+  totalSeconds: number
+): { total: number; speedBonus: number } {
+  if (remainingSeconds <= 0) return { total: basePoints, speedBonus: 0 };
+  const ratio = remainingSeconds / totalSeconds;
+  let speedBonus = 0;
+  if (ratio > 0.75) {
+    speedBonus = 50; // Fast answer bonus
+  } else if (ratio > 0.5) {
+    speedBonus = 30;
+  } else if (ratio > 0.25) {
+    speedBonus = 10;
+  }
+  return { total: basePoints + speedBonus, speedBonus };
 }
 
 export const STEM_QUESTIONS: STEMQuestion[] = [

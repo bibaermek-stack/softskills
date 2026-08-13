@@ -1,7 +1,7 @@
 "use client";
 
 import { isSupabaseConfigured, supabase } from "./client";
-import type { Player, TeamId, GamePhase } from "@/lib/teamGame";
+import type { Player, TeamId, GamePhase, STEMQuestion, QuestionCategory } from "@/lib/teamGame";
 
 export interface GameStateBroadcast {
   roomCode: string;
@@ -12,9 +12,12 @@ export interface GameStateBroadcast {
   teamScores: Record<TeamId, number>;
   answersCount: number;
   revealedAnswerIndex: number | null;
+  category: QuestionCategory;
+  customQuestions?: STEMQuestion[];
 }
 
 type RealtimeCallback = (state: GameStateBroadcast) => void;
+type ReactionCallback = (emoji: string, senderName: string) => void;
 
 const STORAGE_KEY_PREFIX = "team_game_room_";
 
@@ -23,6 +26,7 @@ export class TeamGameRealtimeEngine {
   private channel: ReturnType<NonNullable<typeof supabase>["channel"]> | null = null;
   private broadcastChannel: BroadcastChannel | null = null;
   private listeners: Set<RealtimeCallback> = new Set();
+  private reactionListeners: Set<ReactionCallback> = new Set();
   private currentState: GameStateBroadcast;
   private isHost: boolean;
 
@@ -52,6 +56,7 @@ export class TeamGameRealtimeEngine {
       teamScores: { red: 0, blue: 0, green: 0, yellow: 0 },
       answersCount: 0,
       revealedAnswerIndex: null,
+      category: "Барлығы",
     };
 
     if (initialPlayer && !this.currentState.players.some((p) => p.id === initialPlayer.id)) {
@@ -126,7 +131,28 @@ export class TeamGameRealtimeEngine {
       if (this.isHost) {
         this.broadcastState({});
       }
+    } else if (msg.type === "EMOJI_REACTION") {
+      const data = msg.payload as { emoji: string; senderName: string };
+      if (data && data.emoji) {
+        this.notifyReactionListeners(data.emoji, data.senderName);
+      }
     }
+  }
+
+  public sendReaction(emoji: string, senderName: string) {
+    this.notifyReactionListeners(emoji, senderName);
+    this.sendRawMessage({ type: "EMOJI_REACTION", payload: { emoji, senderName } });
+  }
+
+  public onReaction(callback: ReactionCallback): () => void {
+    this.reactionListeners.add(callback);
+    return () => {
+      this.reactionListeners.delete(callback);
+    };
+  }
+
+  private notifyReactionListeners(emoji: string, senderName: string) {
+    this.reactionListeners.forEach((listener) => listener(emoji, senderName));
   }
 
   public subscribe(callback: RealtimeCallback): () => void {

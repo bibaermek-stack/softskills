@@ -1,16 +1,20 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { QrCodeDisplay } from "./QrCodeDisplay";
 import {
   TEAMS,
   STEM_QUESTIONS,
+  CATEGORIES,
   type Player,
   type TeamId,
   type GamePhase,
+  type QuestionCategory,
+  type STEMQuestion,
 } from "@/lib/teamGame";
 import { TeamGameRealtimeEngine, type GameStateBroadcast } from "@/lib/supabase/teamGameRealtime";
+import { sounds } from "@/lib/soundEffects";
 import { Icon } from "../Icon";
 
 interface TeamGameHostProps {
@@ -18,21 +22,70 @@ interface TeamGameHostProps {
   onClose?: () => void;
 }
 
+interface FloatingEmoji {
+  id: string;
+  emoji: string;
+  senderName: string;
+  left: number;
+}
+
 export function TeamGameHost({ roomCode, onClose }: TeamGameHostProps) {
   const [engine] = useState(() => new TeamGameRealtimeEngine(roomCode, true));
   const [gameState, setGameState] = useState<GameStateBroadcast>(() => engine.getCurrentState());
+  const [selectedCategory, setSelectedCategory] = useState<QuestionCategory>("Барлығы");
+  const [floatingEmojis, setFloatingEmojis] = useState<FloatingEmoji[]>([]);
+  const [isCustomModalOpen, setIsCustomModalOpen] = useState<boolean>(false);
+  const [isMuted, setIsMuted] = useState<boolean>(false);
+
+  // Custom question state
+  const [customTitle, setCustomTitle] = useState("");
+  const [customOptA, setCustomOptA] = useState("");
+  const [customOptB, setCustomOptB] = useState("");
+  const [customOptC, setCustomOptC] = useState("");
+  const [customOptD, setCustomOptD] = useState("");
+  const [customCorrect, setCustomCorrect] = useState(0);
+  const [customExplanation, setCustomExplanation] = useState("");
+
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Active questions pool (Custom or default filtered by category)
+  const activeQuestions: STEMQuestion[] =
+    gameState.customQuestions && gameState.customQuestions.length > 0
+      ? gameState.customQuestions
+      : selectedCategory === "Барлығы"
+      ? STEM_QUESTIONS
+      : STEM_QUESTIONS.filter((q) => q.category === selectedCategory);
+
   useEffect(() => {
-    const unsubscribe = engine.subscribe((state) => {
+    const unsubscribeState = engine.subscribe((state) => {
       setGameState(state);
     });
+
+    const unsubscribeReaction = engine.onReaction((emoji, senderName) => {
+      const id = Math.random().toString(36).substring(2, 9);
+      const left = Math.floor(Math.random() * 80) + 10;
+      setFloatingEmojis((prev) => [...prev, { id, emoji, senderName, left }]);
+      setTimeout(() => {
+        setFloatingEmojis((prev) => prev.filter((item) => item.id !== id));
+      }, 2500);
+    });
+
     return () => {
-      unsubscribe();
+      unsubscribeState();
+      unsubscribeReaction();
       engine.destroy();
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [engine]);
+
+  // Sound triggers on Phase Changes
+  useEffect(() => {
+    if (gameState.phase === "game_over") {
+      sounds.playVictory();
+    } else if (gameState.phase === "reveal") {
+      sounds.playCorrect();
+    }
+  }, [gameState.phase]);
 
   // Handle Question Countdown Timer
   useEffect(() => {
@@ -40,12 +93,16 @@ export function TeamGameHost({ roomCode, onClose }: TeamGameHostProps) {
       if (timerRef.current) clearInterval(timerRef.current);
       timerRef.current = setInterval(() => {
         setGameState((prev) => {
+          if (prev.timerSeconds <= 5 && prev.timerSeconds > 1) {
+            sounds.playTick();
+          }
           if (prev.timerSeconds <= 1) {
             if (timerRef.current) clearInterval(timerRef.current);
+            const q = activeQuestions[prev.currentQuestionIndex];
             const updated = {
               ...prev,
               phase: "reveal" as GamePhase,
-              revealedAnswerIndex: STEM_QUESTIONS[prev.currentQuestionIndex]?.correctIndex ?? 0,
+              revealedAnswerIndex: q ? q.correctIndex : 0,
             };
             engine.broadcastState(updated);
             return updated;
@@ -61,16 +118,17 @@ export function TeamGameHost({ roomCode, onClose }: TeamGameHostProps) {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [gameState.phase, engine]);
+  }, [gameState.phase, engine, activeQuestions]);
 
   const handleStartGame = () => {
-    const firstQ = STEM_QUESTIONS[0];
+    const firstQ = activeQuestions[0] || STEM_QUESTIONS[0];
     const newState: Partial<GameStateBroadcast> = {
       phase: "countdown",
       currentQuestionIndex: 0,
       timerSeconds: firstQ.timeLimit,
       revealedAnswerIndex: null,
       answersCount: 0,
+      category: selectedCategory,
     };
     engine.broadcastState(newState);
 
@@ -80,7 +138,7 @@ export function TeamGameHost({ roomCode, onClose }: TeamGameHostProps) {
   };
 
   const handleRevealAnswer = () => {
-    const q = STEM_QUESTIONS[gameState.currentQuestionIndex];
+    const q = activeQuestions[gameState.currentQuestionIndex];
     engine.broadcastState({
       phase: "reveal",
       revealedAnswerIndex: q ? q.correctIndex : 0,
@@ -89,10 +147,10 @@ export function TeamGameHost({ roomCode, onClose }: TeamGameHostProps) {
 
   const handleNextQuestion = () => {
     const nextIdx = gameState.currentQuestionIndex + 1;
-    if (nextIdx >= STEM_QUESTIONS.length) {
+    if (nextIdx >= activeQuestions.length) {
       engine.broadcastState({ phase: "game_over" });
     } else {
-      const q = STEM_QUESTIONS[nextIdx];
+      const q = activeQuestions[nextIdx];
       engine.broadcastState({
         phase: "question",
         currentQuestionIndex: nextIdx,
@@ -103,7 +161,53 @@ export function TeamGameHost({ roomCode, onClose }: TeamGameHostProps) {
     }
   };
 
-  const currentQ = STEM_QUESTIONS[gameState.currentQuestionIndex];
+  const handleAddCustomQuestion = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customTitle || !customOptA || !customOptB) return;
+
+    const newQ: STEMQuestion = {
+      id: `custom_${Math.random().toString(36).substring(2, 9)}`,
+      category: "STEM & Робототехника",
+      title: customTitle,
+      options: [customOptA, customOptB, customOptC || "Жауап 3", customOptD || "Жауап 4"],
+      correctIndex: customCorrect,
+      explanation: customExplanation || "Арнайы мұғалім сұрағы.",
+      timeLimit: 20,
+      points: 100,
+    };
+
+    const currentCustom = gameState.customQuestions || [];
+    const updatedCustom = [...currentCustom, newQ];
+    engine.broadcastState({ customQuestions: updatedCustom });
+
+    // Reset inputs
+    setCustomTitle("");
+    setCustomOptA("");
+    setCustomOptB("");
+    setCustomOptC("");
+    setCustomOptD("");
+    setCustomExplanation("");
+    setIsCustomModalOpen(false);
+  };
+
+  const handleCloseRoom = () => {
+    engine.broadcastState({ phase: "room_closed" });
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.removeItem(`team_game_room_${roomCode}`);
+      } catch {
+        // Ignore
+      }
+    }
+    onClose?.();
+  };
+
+  const toggleSoundMute = () => {
+    const muted = sounds.toggleMute();
+    setIsMuted(muted);
+  };
+
+  const currentQ = activeQuestions[gameState.currentQuestionIndex] || STEM_QUESTIONS[0];
 
   // Group players by Team
   const playersByTeam = TEAMS.reduce((acc, team) => {
@@ -119,20 +223,30 @@ export function TeamGameHost({ roomCode, onClose }: TeamGameHostProps) {
     })
     .sort((a, b) => b.score - a.score);
 
-  const handleCloseRoom = () => {
-    engine.broadcastState({ phase: "room_closed" });
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.removeItem(`team_game_room_${roomCode}`);
-      } catch {
-        // Ignore
-      }
-    }
-    onClose?.();
-  };
-
   return (
-    <div className="mx-auto max-w-5xl rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900">
+    <div className="relative mx-auto max-w-5xl rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900 overflow-hidden">
+      {/* Floating Reactions Overlay */}
+      <div className="pointer-events-none absolute inset-0 z-40 overflow-hidden">
+        <AnimatePresence>
+          {floatingEmojis.map((item) => (
+            <motion.div
+              key={item.id}
+              initial={{ opacity: 1, y: 350, scale: 0.5 }}
+              animate={{ opacity: 0, y: 50, scale: 1.5 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 2.2, ease: "easeOut" }}
+              style={{ left: `${item.left}%` }}
+              className="absolute bottom-10 flex flex-col items-center"
+            >
+              <span className="text-4xl drop-shadow-md">{item.emoji}</span>
+              <span className="rounded-md bg-slate-900/80 px-2 py-0.5 text-[0.65rem] font-bold text-white shadow-sm">
+                {item.senderName}
+              </span>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+
       {/* Header Bar */}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4 dark:border-slate-800">
         <div className="flex items-center gap-3">
@@ -144,38 +258,82 @@ export function TeamGameHost({ roomCode, onClose }: TeamGameHostProps) {
               Командалық Ойын Панелі (Host)
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Бөлме коды: <span className="font-bold text-blue-600">{roomCode}</span> • Пайдаланушылар: {gameState.players.length}
+              Бөлме коды: <span className="font-bold text-blue-600">{roomCode}</span> • Ойыншылар: {gameState.players.length}
             </p>
           </div>
         </div>
 
-        {onClose && (
+        <div className="flex items-center gap-2">
+          {/* Sound Toggle */}
           <button
             type="button"
-            onClick={handleCloseRoom}
-            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+            onClick={toggleSoundMute}
+            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
           >
-            <Icon name="X" className="size-4" />
-            Бөлмені жабу
+            <Icon name={isMuted ? "Bell" : "Bell"} className="size-4 text-blue-600" />
+            {isMuted ? "Дыбыс сөндірулі" : "Дыбыс қосулы"}
           </button>
-        )}
+
+          {onClose && (
+            <button
+              type="button"
+              onClick={handleCloseRoom}
+              className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-100 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300"
+            >
+              <Icon name="X" className="size-4" />
+              Бөлмені жабу
+            </button>
+          )}
+        </div>
       </div>
 
       {/* PHASE 1: LOBBY */}
       {gameState.phase === "lobby" && (
         <div className="grid gap-6 md:grid-cols-12">
-          {/* Left: QR Code & Code */}
+          {/* Left: QR Code & Category Selector */}
           <div className="flex flex-col items-center justify-center rounded-2xl bg-slate-50 p-6 dark:bg-slate-800/50 md:col-span-5">
-            <h3 className="mb-4 text-center font-display text-sm font-bold text-slate-800 dark:text-slate-200">
-              Студенттер қосылуы үшін QR кодты көрсетіңіз:
+            <h3 className="mb-3 text-center font-display text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+              1. Пән Тақырыбын Таңдаңыз:
             </h3>
-            <QrCodeDisplay roomCode={roomCode} size={210} />
+
+            {/* Category Selector */}
+            <div className="mb-4 flex flex-wrap justify-center gap-1.5">
+              {CATEGORIES.map((cat) => {
+                const active = selectedCategory === cat;
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`rounded-lg px-2.5 py-1 text-xs font-bold transition ${
+                      active
+                        ? "bg-blue-600 text-white shadow-sm"
+                        : "bg-white text-slate-700 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-300"
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                );
+              })}
+            </div>
+
+            <QrCodeDisplay roomCode={roomCode} size={190} />
+
+            {/* Custom Question Button */}
+            <button
+              type="button"
+              onClick={() => setIsCustomModalOpen(true)}
+              className="mt-4 flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50/80 px-4 py-2 text-xs font-bold text-blue-700 transition hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/50 dark:text-blue-300"
+            >
+              <Icon name="PlusCircle" className="size-4" />
+              + Өз сұрағыңды қосу ({gameState.customQuestions?.length || 0})
+            </button>
 
             <button
               type="button"
               onClick={handleStartGame}
               disabled={gameState.players.length === 0}
-              className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-lg shadow-blue-500/25 transition hover:bg-blue-700 active:scale-[0.98] disabled:opacity-50 disabled:shadow-none"
+              className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-lg shadow-blue-500/25 transition hover:bg-blue-700 active:scale-[0.98] disabled:opacity-50 disabled:shadow-none"
             >
               <Icon name="Play" className="size-4 fill-white" />
               Ойынды Бастау ({gameState.players.length} Ойыншы)
@@ -247,7 +405,7 @@ export function TeamGameHost({ roomCode, onClose }: TeamGameHostProps) {
             🚀
           </motion.div>
           <h3 className="mt-6 text-2xl font-bold text-slate-900 dark:text-white">
-            Ойын дайындалуда...
+            Ойын дайындалуда... ({selectedCategory})
           </h3>
           <p className="text-sm text-slate-500">Сұрақтар басталуда!</p>
         </div>
@@ -259,7 +417,7 @@ export function TeamGameHost({ roomCode, onClose }: TeamGameHostProps) {
           {/* Top Bar: Progress & Timer */}
           <div className="flex items-center justify-between rounded-xl bg-slate-50 p-3.5 dark:bg-slate-800">
             <span className="rounded-md bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
-              Сұрақ {gameState.currentQuestionIndex + 1} / {STEM_QUESTIONS.length} • {currentQ.category}
+              Сұрақ {gameState.currentQuestionIndex + 1} / {activeQuestions.length} • {currentQ.category}
             </span>
 
             <div className="flex items-center gap-2">
@@ -345,7 +503,7 @@ export function TeamGameHost({ roomCode, onClose }: TeamGameHostProps) {
                 onClick={handleNextQuestion}
                 className="flex items-center gap-2 rounded-xl bg-green-600 px-5 py-2.5 text-xs font-bold text-white transition hover:bg-green-700"
               >
-                {gameState.currentQuestionIndex + 1 >= STEM_QUESTIONS.length ? (
+                {gameState.currentQuestionIndex + 1 >= activeQuestions.length ? (
                   <>
                     <Icon name="Trophy" className="size-4" /> Финалдық Нәтижені Көру
                   </>
@@ -417,6 +575,140 @@ export function TeamGameHost({ roomCode, onClose }: TeamGameHostProps) {
           </button>
         </div>
       )}
+
+      {/* CUSTOM QUESTION MODAL */}
+      <AnimatePresence>
+        {isCustomModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.95 }}
+              className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900"
+            >
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
+                <h3 className="font-display text-base font-bold text-slate-900 dark:text-white">
+                  Арнайы Сұрақ Қосу
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setIsCustomModalOpen(false)}
+                  className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
+                >
+                  <Icon name="X" className="size-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleAddCustomQuestion} className="mt-4 space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Сұрақ мәтіні:
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Сұрақты осы жерге жазыңыз..."
+                    value={customTitle}
+                    onChange={(e) => setCustomTitle(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-900 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[0.7rem] font-bold text-red-500">Жауап A:</label>
+                    <input
+                      type="text"
+                      required
+                      value={customOptA}
+                      onChange={(e) => setCustomOptA(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[0.7rem] font-bold text-blue-500">Жауап B:</label>
+                    <input
+                      type="text"
+                      required
+                      value={customOptB}
+                      onChange={(e) => setCustomOptB(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[0.7rem] font-bold text-green-500">Жауап C:</label>
+                    <input
+                      type="text"
+                      value={customOptC}
+                      onChange={(e) => setCustomOptC(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[0.7rem] font-bold text-amber-500">Жауап D:</label>
+                    <input
+                      type="text"
+                      value={customOptD}
+                      onChange={(e) => setCustomOptD(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Дұрыс жауабы қайсысы?:
+                  </label>
+                  <select
+                    value={customCorrect}
+                    onChange={(e) => setCustomCorrect(Number(e.target.value))}
+                    className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-900 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  >
+                    <option value={0}>A жауабы</option>
+                    <option value={1}>B жауабы</option>
+                    <option value={2}>C жауабы</option>
+                    <option value={3}>D жауабы</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Түсіндірме (міндетті емес):
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Дұрыс жауаптың қысқаша түсіндірмесі..."
+                    value={customExplanation}
+                    onChange={(e) => setCustomExplanation(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-900 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsCustomModalOpen(false)}
+                    className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 dark:border-slate-700 dark:text-slate-300"
+                  >
+                    Бас тарту
+                  </button>
+                  <button
+                    type="submit"
+                    className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-blue-700"
+                  >
+                    Сұрақты Сақтау
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

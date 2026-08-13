@@ -5,10 +5,13 @@ import {
   TEAMS,
   AVATARS,
   STEM_QUESTIONS,
+  REACTION_EMOJIS,
+  calculatePointsWithSpeedBonus,
   type Player,
   type TeamId,
 } from "@/lib/teamGame";
 import { TeamGameRealtimeEngine, type GameStateBroadcast } from "@/lib/supabase/teamGameRealtime";
+import { sounds } from "@/lib/soundEffects";
 import { Icon } from "../Icon";
 
 interface TeamGamePlayerProps {
@@ -29,6 +32,7 @@ export function TeamGamePlayer({ initialRoomCode = "", onExit }: TeamGamePlayerP
 
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [hasAnswered, setHasAnswered] = useState(false);
+  const [lastBonus, setLastBonus] = useState<number>(0);
 
   useEffect(() => {
     if (initialRoomCode) {
@@ -51,6 +55,7 @@ export function TeamGamePlayer({ initialRoomCode = "", onExit }: TeamGamePlayerP
     if (gameState?.phase === "question") {
       setSelectedOption(null);
       setHasAnswered(false);
+      setLastBonus(0);
     }
   }, [gameState?.currentQuestionIndex, gameState?.phase]);
 
@@ -87,9 +92,26 @@ export function TeamGamePlayer({ initialRoomCode = "", onExit }: TeamGamePlayerP
     setSelectedOption(optionIdx);
     setHasAnswered(true);
 
-    const q = STEM_QUESTIONS[gameState.currentQuestionIndex];
+    const activeQuestions =
+      gameState.customQuestions && gameState.customQuestions.length > 0
+        ? gameState.customQuestions
+        : STEM_QUESTIONS;
+    const q = activeQuestions[gameState.currentQuestionIndex];
     const isCorrect = q && optionIdx === q.correctIndex;
-    const gainedPoints = isCorrect ? q.points : 0;
+
+    let gainedPoints = 0;
+    let speedBonus = 0;
+
+    if (isCorrect) {
+      const calc = calculatePointsWithSpeedBonus(q.points, gameState.timerSeconds, q.timeLimit);
+      gainedPoints = calc.total;
+      speedBonus = calc.speedBonus;
+      sounds.playCorrect();
+    } else {
+      sounds.playWrong();
+    }
+
+    setLastBonus(speedBonus);
 
     // Update player & team score
     const updatedPlayers = gameState.players.map((p) => {
@@ -221,7 +243,11 @@ export function TeamGamePlayer({ initialRoomCode = "", onExit }: TeamGamePlayerP
   }
 
   // GAME VIEW: Player Controller
-  const currentQ = STEM_QUESTIONS[gameState?.currentQuestionIndex ?? 0];
+  const activeQuestions =
+    gameState?.customQuestions && gameState.customQuestions.length > 0
+      ? gameState.customQuestions
+      : STEM_QUESTIONS;
+  const currentQ = activeQuestions[gameState?.currentQuestionIndex ?? 0];
   const myPlayer = gameState?.players.find((p) => p.id === myPlayerId);
   const myTeam = TEAMS.find((t) => t.id === selectedTeam);
 
@@ -276,7 +302,7 @@ export function TeamGamePlayer({ initialRoomCode = "", onExit }: TeamGamePlayerP
       {(gameState?.phase === "question" || gameState?.phase === "reveal") && currentQ && (
         <div className="mt-4 flex flex-col gap-4">
           <div className="flex items-center justify-between text-xs font-bold text-slate-500">
-            <span>Сұрақ {gameState.currentQuestionIndex + 1} / {STEM_QUESTIONS.length}</span>
+            <span>Сұрақ {gameState.currentQuestionIndex + 1} / {activeQuestions.length}</span>
             <span className="font-mono text-sm text-blue-600">{gameState.timerSeconds}с</span>
           </div>
 
@@ -321,8 +347,34 @@ export function TeamGamePlayer({ initialRoomCode = "", onExit }: TeamGamePlayerP
           {hasAnswered && gameState.phase === "question" && (
             <div className="mt-2 rounded-xl bg-blue-50 p-3 text-center text-xs font-bold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
               ✓ Жауабыңыз қабылданды! Басқа ойыншыларды күтіңіз...
+              {lastBonus > 0 && (
+                <span className="block mt-1 text-[0.7rem] text-amber-600 font-black">
+                  ⚡ Жылдамдық Бонусы +{lastBonus}!
+                </span>
+              )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* LIVE REACTION EMOJI BAR */}
+      {joined && gameState?.phase !== "room_closed" && (
+        <div className="mt-4 border-t border-slate-100 pt-3 dark:border-slate-800">
+          <span className="block text-[0.65rem] font-bold uppercase tracking-wider text-slate-400 text-center mb-1.5">
+            Эмодзи Реакция Жіберу:
+          </span>
+          <div className="flex justify-center gap-2">
+            {REACTION_EMOJIS.map((emoji) => (
+              <button
+                key={emoji}
+                type="button"
+                onClick={() => engine?.sendReaction(emoji, playerName)}
+                className="rounded-xl bg-slate-100 p-2 text-lg hover:bg-slate-200 hover:scale-125 transition active:scale-95 dark:bg-slate-800 dark:hover:bg-slate-700"
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

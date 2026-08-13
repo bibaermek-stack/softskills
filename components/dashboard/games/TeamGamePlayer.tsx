@@ -72,15 +72,8 @@ export function TeamGamePlayer({ initialRoomCode = "", onExit }: TeamGamePlayerP
       joinedAt: Date.now(),
     };
 
-    const newEngine = new TeamGameRealtimeEngine(cleanCode, [newPlayer]);
-    const current = newEngine.getCurrentState();
-
-    // Add player to existing room players list if not present
-    const updatedPlayers = current.players.some((p) => p.id === pid)
-      ? current.players
-      : [...current.players, newPlayer];
-
-    newEngine.broadcastState({ players: updatedPlayers });
+    const newEngine = new TeamGameRealtimeEngine(cleanCode, false, newPlayer);
+    newEngine.joinRoom(newPlayer);
 
     setMyPlayerId(pid);
     setEngine(newEngine);

@@ -19,7 +19,7 @@ interface TeamGameHostProps {
 }
 
 export function TeamGameHost({ roomCode, onClose }: TeamGameHostProps) {
-  const [engine] = useState(() => new TeamGameRealtimeEngine(roomCode));
+  const [engine] = useState(() => new TeamGameRealtimeEngine(roomCode, true));
   const [gameState, setGameState] = useState<GameStateBroadcast>(() => engine.getCurrentState());
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 

@@ -51,6 +51,7 @@ export const dashboardLibraryRoute = "/dashboard/resources";
 export const dashboardNav: NavItem[] = [
   { id: "home", label: "Басты бет", icon: "House", href: "#dash-top", kind: "anchor" },
   { id: "lessons", label: "Сабақтар", icon: "ClipboardList", href: "/dashboard/lessons", kind: "route" },
+  { id: "team-game", label: "Командалық ойын", icon: "Users", href: "/dashboard/team-game", kind: "route" },
   { id: "circuit", label: "Электр тізбегі", icon: "Zap", href: "/dashboard/simulations/circuit", kind: "route" },
   { id: "astronomy", label: "Күн жүйесі", icon: "Globe", href: "/dashboard/simulations/astronomy", kind: "route" },
   { id: "code", label: "Python Код", icon: "CircuitBoard", href: "/dashboard/simulations/code", kind: "route" },

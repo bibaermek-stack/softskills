@@ -19,6 +19,7 @@ import { Icon } from "../Icon";
 
 interface TeamGameHostProps {
   roomCode: string;
+  initialQuestions?: STEMQuestion[];
   onClose?: () => void;
 }
 
@@ -29,8 +30,14 @@ interface FloatingEmoji {
   left: number;
 }
 
-export function TeamGameHost({ roomCode, onClose }: TeamGameHostProps) {
-  const [engine] = useState(() => new TeamGameRealtimeEngine(roomCode, true));
+export function TeamGameHost({ roomCode, initialQuestions, onClose }: TeamGameHostProps) {
+  const [engine] = useState(() => {
+    const eng = new TeamGameRealtimeEngine(roomCode, true);
+    if (initialQuestions && initialQuestions.length > 0) {
+      eng.broadcastState({ customQuestions: initialQuestions });
+    }
+    return eng;
+  });
   const [gameState, setGameState] = useState<GameStateBroadcast>(() => engine.getCurrentState());
   const [selectedCategory, setSelectedCategory] = useState<QuestionCategory>("Барлығы");
   const [floatingEmojis, setFloatingEmojis] = useState<FloatingEmoji[]>([]);

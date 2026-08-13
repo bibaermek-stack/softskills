@@ -16,11 +16,20 @@ export function QrCodeDisplay({ roomCode, joinUrl, size = 200 }: QrCodeDisplayPr
   const [copied, setCopied] = useState<boolean>(false);
   const [isFullScreen, setIsFullScreen] = useState<boolean>(false);
 
-  const fullUrl =
-    joinUrl ||
-    (typeof window !== "undefined"
-      ? `${window.location.origin}/play?code=${roomCode}`
-      : `/play?code=${roomCode}`);
+  const getBaseUrl = () => {
+    if (joinUrl) return joinUrl;
+    if (typeof window !== "undefined" && window.location.origin && window.location.origin !== "null") {
+      return `${window.location.origin}/play?code=${roomCode}`;
+    }
+    const envUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_VERCEL_URL;
+    if (envUrl) {
+      const prefix = envUrl.startsWith("http") ? envUrl : `https://${envUrl}`;
+      return `${prefix}/play?code=${roomCode}`;
+    }
+    return `/play?code=${roomCode}`;
+  };
+
+  const fullUrl = getBaseUrl();
 
   useEffect(() => {
     let isMounted = true;

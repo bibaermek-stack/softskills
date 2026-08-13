@@ -50,8 +50,11 @@ function StageBlock({
   );
 }
 
+import { LessonTeamModal } from "./games/LessonTeamModal";
+
 export function LessonPlayer({ lesson }: { lesson: Lesson }) {
   const [stageId, setStageId] = useState<LessonStageId>("goals");
+  const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
   const reduced = usePrefersReducedMotion();
 
   const index = STAGE_ORDER.indexOf(stageId);
@@ -97,12 +100,25 @@ export function LessonPlayer({ lesson }: { lesson: Lesson }) {
         >
           <IconBadge name={lesson.icon} accent={lesson.accent} size="lg" />
           <div className="min-w-0 flex-1">
-            <p
-              className="text-[0.68rem] font-semibold tracking-[0.14em] uppercase"
-              style={{ color: lesson.accent }}
-            >
-              Интерактивті сабақ
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p
+                className="text-[0.68rem] font-semibold tracking-[0.14em] uppercase"
+                style={{ color: lesson.accent }}
+              >
+                Интерактивті сабақ
+              </p>
+
+              {/* Lesson Team Battle Button */}
+              <button
+                type="button"
+                onClick={() => setIsTeamModalOpen(true)}
+                className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-md shadow-blue-500/25 transition hover:bg-blue-700 active:scale-95"
+              >
+                <Icon name="Users" className="size-4" />
+                👥 Командалық Жарыс Ашу (QR Code)
+              </button>
+            </div>
+
             <h1 className="mt-0.5 font-display text-2xl leading-tight font-bold text-ink-900 sm:text-3xl dark:text-white">
               {lesson.title}
             </h1>
@@ -348,6 +364,13 @@ export function LessonPlayer({ lesson }: { lesson: Lesson }) {
           </button>
         ) : null}
       </nav>
+
+      <LessonTeamModal
+        lessonId={lesson.id}
+        lessonTitle={lesson.title}
+        isOpen={isTeamModalOpen}
+        onClose={() => setIsTeamModalOpen(false)}
+      />
     </div>
   );
 }

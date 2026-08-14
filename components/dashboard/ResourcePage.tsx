@@ -2,6 +2,7 @@ import Link from "next/link";
 import { multimediaResources, onlineTools, type ResourceItem } from "@/lib/dashboard";
 import { Icon } from "./Icon";
 import { IconBadge } from "./Panel";
+import { VRSimulator } from "./VRSimulator";
 
 /** Барлық ресурс — екі топтың біріктірілген тізімі. */
 export const allResources: (ResourceItem & { group: "multimedia" | "online" })[] = [
@@ -69,6 +70,13 @@ export function ResourcePage({ id }: { id: string }) {
           </div>
         </div>
       </header>
+
+      {/* VR/AR Тренажер болса — толыққанды A-Frame WebXR 3D симуляторын шығару */}
+      {resource.id === "vr" && (
+        <div className="mt-1">
+          <VRSimulator />
+        </div>
+      )}
 
       <div className="grid gap-3 lg:grid-cols-2">
         <section className="dash-card rounded-2xl p-4 sm:p-5">

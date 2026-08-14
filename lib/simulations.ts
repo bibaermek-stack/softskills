@@ -98,9 +98,19 @@ export const simulationCatalog: SimulationCatalogItem[] = [
     title: "Python STEM код зертханасы",
     eyebrow: "Оқу демонстрациясы",
     icon: "CircuitBoard",
-    accent: "#059669",
+    accent: "#16a34a",
     lead:
-      "Дайын Python мысалдарын өзгертіп көріп, STEM есептерінің алдын ала дайындалған нәтижелерімен салыстырыңыз.",
+      "Ғылыми есептеулер, графиктер және модельдеу алгоритмдерін тікелей браузерде іске қосыңыз.",
+  },
+  {
+    id: "vr",
+    href: "/dashboard/resources/vr",
+    title: "Виртуалды тренажерлар (VR/AR)",
+    eyebrow: "A-Frame WebXR • Meta Quest",
+    icon: "Scan",
+    accent: "#8b5cf6",
+    lead:
+      "Meta Quest және кез келген құрылғы арқылы 3D иммерсивті кеңістікте физика, ғарыш, тарих және робототехника тренажерларынан өтіңіз.",
   },
 ];
 

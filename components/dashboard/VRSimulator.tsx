@@ -160,6 +160,19 @@ function generateAFrameHTML(scenario: VRScenarioId): string {
         });
       }
     });
+
+    window.addEventListener('message', function(e) {
+      if (e.data && e.data.type === 'TRIGGER_ENTER_VR') {
+        var scene = document.querySelector('a-scene');
+        if (scene) {
+          if (scene.is('vr-mode')) {
+            scene.exitVR();
+          } else {
+            scene.enterVR();
+          }
+        }
+      }
+    });
   </script>
 
   <a-scene
@@ -449,6 +462,10 @@ export function VRSimulator() {
     }
   };
 
+  const triggerEnterVR = () => {
+    iframeRef.current?.contentWindow?.postMessage({ type: "TRIGGER_ENTER_VR" }, "*");
+  };
+
   return (
     <section className="dash-card relative flex flex-col overflow-hidden rounded-3xl border border-brand-500/20 bg-slate-950 p-4 text-white shadow-lift sm:p-6 lg:p-7">
       {/* Жоғарғы бақылау тақырыбы */}
@@ -476,11 +493,21 @@ export function VRSimulator() {
         </div>
 
         {/* Құрылғы режимдері & Басқару түймелері */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            type="button"
+            onClick={triggerEnterVR}
+            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-4 py-2.5 text-[0.82rem] font-bold text-white shadow-lift transition hover:scale-[1.02] active:scale-[0.98]"
+            title="Meta Quest Link немесе SteamVR арқылы қосылған шлемде VR іске қосу"
+          >
+            <Icon name="Scan" className="size-4" />
+            <span>🥽 VR Шлемді іске қосу (Quest Link)</span>
+          </button>
+
           <button
             type="button"
             onClick={toggleFullscreen}
-            className="flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/10 px-3.5 py-2 text-[0.78rem] font-semibold text-white transition hover:bg-white/20"
+            className="flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/10 px-3.5 py-2.5 text-[0.78rem] font-semibold text-white transition hover:bg-white/20"
             title="Толық экран режимі"
           >
             <Icon name="Expand" className="size-4" />

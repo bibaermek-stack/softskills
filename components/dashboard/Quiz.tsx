@@ -130,9 +130,26 @@ export function Quiz({
       total: result.total,
       attempts: state.attempt,
       durationMs: Date.now() - state.startedAt,
+      quizAnswers: spec.questions.map((item) => ({
+        questionId: item.id,
+        chosenIndices: state.answers[item.id] ?? [],
+        correct: isAnswerCorrect(item, state.answers[item.id] ?? []),
+      })),
       at: Date.now(),
     });
-  }, [state.phase, state.attempt, state.startedAt, spec.id, lessonId, subject, result.score, result.correct, result.total]);
+  }, [
+    state.phase,
+    state.attempt,
+    state.startedAt,
+    state.answers,
+    spec.id,
+    spec.questions,
+    lessonId,
+    subject,
+    result.score,
+    result.correct,
+    result.total,
+  ]);
 
   // Келесі сұраққа өткенде фокусты жаңа картаға жылжыту.
   useEffect(() => {

@@ -81,14 +81,24 @@ export function SubjectGrid() {
                   {subject.softSkills.join(", ")}
                 </Field>
 
-                <Link
-                  href={`/dashboard/modules/${subject.id}`}
-                  className="mt-auto flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[0.74rem] font-semibold text-white transition-transform duration-300 group-hover:scale-[1.03]"
-                  style={{ backgroundColor: subject.accent }}
-                >
-                  Модульді ашу
-                  <Icon name="ArrowRight" className="size-3.5" strokeWidth={2.2} />
-                </Link>
+                <div className="mt-auto flex flex-col gap-1.5 pt-1">
+                  <Link
+                    href={`/dashboard/quiz/${subject.id}`}
+                    className="flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[0.72rem] font-bold text-white shadow-soft transition-transform duration-300 hover:scale-[1.02]"
+                    style={{ backgroundColor: subject.accent }}
+                  >
+                    <Icon name="Award" className="size-3.5" />
+                    200 тест викторинасы
+                  </Link>
+
+                  <Link
+                    href={`/dashboard/modules/${subject.id}`}
+                    className="flex items-center justify-center gap-1 rounded-lg border border-ink-700/10 bg-white/70 px-2.5 py-1 text-[0.7rem] font-semibold text-ink-800 transition hover:bg-white dark:border-white/10 dark:bg-white/5 dark:text-paper-100 dark:hover:bg-white/10"
+                  >
+                    Модуль сипаттамасы
+                    <Icon name="ArrowRight" className="size-3" />
+                  </Link>
+                </div>
               </div>
             </div>
           </motion.article>

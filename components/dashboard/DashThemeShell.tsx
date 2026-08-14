@@ -38,9 +38,9 @@ function DashShellInner({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Auto prompt Auth modal if unauthenticated after initial load check
+  // Prompt for sign-in, or finish a provisional OAuth profile by choosing a role.
   useEffect(() => {
-    if (mounted && !loading && !user) {
+    if (mounted && !loading && (!user || user.roleLocked === false)) {
       setIsAuthOpen(true);
     }
   }, [mounted, loading, user]);
@@ -56,7 +56,7 @@ function DashShellInner({ children }: { children: ReactNode }) {
       <AiTutorWidget />
 
       {/* Global Search Modal */}
-      <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsAuthOpen(false)} />
+      <GlobalSearchModal isOpen={isSearchOpen} onCloseAction={() => setIsSearchOpen(false)} />
 
       {/* Classroom Interactive Presenter Mode Modal */}
       <ClassroomPresenterModal />

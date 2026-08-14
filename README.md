@@ -1,11 +1,13 @@
-# Виртуалды STEM оқыту платформасы — ақпараттық сайт
+# Виртуалды STEM оқыту платформасы
 
-**BR28713097** гранты аясында әзірленген виртуалды STEM оқыту платформасының
-таныстырылым сайты. Қаржыландырушы — Қазақстан Республикасы Ғылым және жоғары
-білім министрлігінің Ғылым комитеті.
+**BR28713097** гранты аясында әзірленген виртуалды STEM оқыту платформасы.
+Қаржыландырушы — Қазақстан Республикасы Ғылым және жоғары білім министрлігінің
+Ғылым комитеті.
 
-Сайт **тек ақпараттық**: аутентификация, дашборд, LMS және дерекқор жоқ.
-Беттегі барлық сан мен диаграмма — көрнекі демонстрациялық мазмұн.
+Жоба таныстырылым сайтын және интерактивті LMS панелін біріктіреді. Панельде
+сабақтар, тесттер, ойындар, симуляциялар, оқытушы аналитикасы және Supabase
+аутентификациясы бар. Supabase кілттері берілмесе, тіркелгі мен оқу нәтижелері
+браузердегі демонстрациялық режимде жұмыс істейді.
 
 ## Тіл және типографика
 
@@ -25,8 +27,9 @@
 
 ## Stack
 
-Next.js 15 (App Router) · TypeScript · Tailwind CSS v4 · React Three Fiber +
-three.js · Framer Motion · GSAP (ScrollTrigger) · Lenis.
+Next.js 15 (App Router) · React 19 · TypeScript · Tailwind CSS v4 · Supabase ·
+Zustand · React Three Fiber + three.js · Framer Motion · GSAP (ScrollTrigger) ·
+Lenis.
 
 ```bash
 npm install
@@ -38,19 +41,23 @@ npm run lint
 ## Structure
 
 ```
-app/                 layout, page, metadata, sitemap, robots, icon
+app/                   public site, auth callback and dashboard routes
 components/
-  layout/            Navbar, Footer
-  providers/         SmoothScroll (Lenis ⇄ GSAP ScrollTrigger)
-  sections/          one file per page section
-  three/             BookScene, Book, Environment (podium, particles, sparks)
-  ui/                Reveal, Section, GalleryTile, Logo, ModuleIcon, ModuleVisual
+  dashboard/            lessons, analytics, games and simulations
+  layout/               Navbar, Footer
+  providers/            auth and smooth-scroll providers
+  sections/             public-site sections
+  three/                WebGL scenes and models
+  ui/                   shared UI, auth, search and presenter modals
 lib/
-  content.ts         all copy, sourced from the research document
-  bookBus.ts         event bus so lower sections can drive the hero canvas
-  hooks.ts, cn.ts
+  supabase/             account, relationship and realtime data access
+  content.ts            public-site copy
+  lessons.ts            interactive lesson definitions
+  progress.ts           local progress plus authenticated Supabase persistence
+  dataStore.ts          learning-record data access
+supabase/migrations/    schema, RLS policies, triggers and XP calculation
 scripts/
-  optimize-models.mjs  the GLB pipeline (see below)
+  optimize-models.mjs   the GLB pipeline (see below)
 ```
 
 `lib/content.ts` is the single source of truth for copy. Section numbers in its

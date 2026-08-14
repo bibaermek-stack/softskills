@@ -2,8 +2,11 @@
 
 import { useEffect, useState } from "react";
 import type { SubjectId, LessonStageId } from "./dashboard";
+import type { GameType, QuizAttempt } from "./types";
 import { lessons } from "./lessons";
 import { softSkillsRadar } from "./content";
+import { useAuthStore } from "./authStore";
+import { isSupabaseConfigured, supabase } from "./supabase/client";
 
 /**
  * Оқушының нәтижелерін браузерде сақтау.
@@ -34,6 +37,10 @@ export type ProgressRecord = {
   total: number;
   attempts: number;
   durationMs: number;
+  /** Supabase analytics uses the shared LMS game taxonomy. */
+  gameType?: GameType;
+  /** Per-question selections retained for review and question-level analytics. */
+  quizAnswers?: QuizAttempt["answers"];
   /** Аяқталған уақыты. */
   at: number;
 };
@@ -94,12 +101,57 @@ function writeProgress(state: ProgressState): void {
   }
 }
 
+async function persistRecord(record: ProgressRecord): Promise<void> {
+  if (!isSupabaseConfigured || !supabase || record.kind === "sim") return;
+
+  const profile = useAuthStore.getState().user;
+  if (!profile) return;
+
+  // A demo identity can still be selected while environment keys exist. Verify
+  // the actual Supabase session before sending its non-UUID demo id to Postgres.
+  const { data, error } = await supabase.auth.getUser();
+  if (error || data.user?.id !== profile.uid) return;
+
+  const eventId = `${record.kind}_${record.at}_${Math.random().toString(36).slice(2, 8)}`;
+  const occurredAt = new Date(record.at).toISOString();
+
+  const { saveGameResult, saveQuizAttempt } = await import("./dataStore");
+
+  if (record.kind === "quiz") {
+    await saveQuizAttempt({
+      id: eventId,
+      userId: profile.uid,
+      moduleId: record.lessonId,
+      score: record.correct,
+      total: record.total,
+      answers: record.quizAnswers ?? [],
+      takenAt: occurredAt,
+    });
+  } else if (record.gameType) {
+    await saveGameResult({
+      id: eventId,
+      userId: profile.uid,
+      moduleId: record.lessonId,
+      gameType: record.gameType,
+      score: record.score ?? 0,
+      completedAt: occurredAt,
+    });
+  }
+
+  const { syncXp } = await import("./xp");
+  await syncXp(profile);
+}
+
 /** Жаңа нәтижені қосу және барлық тыңдаушыға хабарлау. */
 export function saveRecord(record: ProgressRecord): void {
   const current = readProgress();
   const records = [...current.records, record].slice(-MAX_RECORDS);
   writeProgress({ version: 1, records });
   window.dispatchEvent(new CustomEvent(PROGRESS_EVENT));
+
+  void persistRecord(record).catch((error: unknown) => {
+    console.error("Оқу нәтижесін Supabase-ке сақтау мүмкін болмады:", error);
+  });
 }
 
 export function clearProgress(): void {

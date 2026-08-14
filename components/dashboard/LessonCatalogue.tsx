@@ -177,9 +177,27 @@ export function LessonCatalogue({ variant }: { variant: "block" | "page" }) {
   return (
     <Panel id="dash-lessons" className="p-3.5">
       <ZoneBanner title="Интерактивті сабақтар: ойын, симуляция, тест" />
-      <div className="mt-3.5">
-        <LessonCards />
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-500/20 bg-brand-50/60 p-3.5 dark:bg-brand-950/20 dark:border-brand-500/30">
+        <div className="flex items-center gap-2.5">
+          <IconBadge name="Award" accent="#3b82f6" size="sm" />
+          <div>
+            <p className="font-display text-[0.82rem] font-bold text-ink-900 dark:text-white">
+              5 Пәннен 200 Жағдаяттық тест викторинасы
+            </p>
+            <p className="text-[0.72rem] text-ink-700/80 dark:text-paper-300">
+              Математика, физика, тарих, әдебиет, технология · Soft Skills диагностикасы
+            </p>
+          </div>
+        </div>
+        <Link
+          href="/dashboard/quiz"
+          className="flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-[0.74rem] font-bold text-white shadow-soft transition hover:bg-brand-500 hover:scale-[1.02]"
+        >
+          Викториналарға өту
+          <Icon name="ArrowRight" className="size-3.5" />
+        </Link>
       </div>
+
       <h3 className="mt-4 text-[0.72rem] font-bold tracking-wide text-ink-700/70 uppercase dark:text-paper-300">
         Интерактивті симуляциялар
       </h3>

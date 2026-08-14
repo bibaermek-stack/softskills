@@ -11,6 +11,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
+    let unsubscribe: (() => void) | undefined;
 
     async function initAuth() {
       if (isSupabaseConfigured && supabase) {
@@ -28,9 +29,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (mounted) setLoading(false);
         }
 
-        // Listen for auth state changes (OAuth redirect, sign in, sign out)
+        if (!mounted) return;
+
+        // Listen for auth state changes (OAuth redirect, sign in, sign out).
         const { data: listener } = supabase.auth.onAuthStateChange(
-          async (event, session) => {
+          async (_event, session) => {
             if (!mounted) return;
             if (session?.user) {
               const profile = await fetchProfile(session.user.id);
@@ -43,10 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setLoading(false);
           }
         );
-
-        return () => {
-          listener.subscription.unsubscribe();
-        };
+        unsubscribe = () => listener.subscription.unsubscribe();
       } else {
         // Fallback mock session check
         const mockUser = readMockSession();
@@ -57,10 +57,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    initAuth();
+    void initAuth();
 
     return () => {
       mounted = false;
+      unsubscribe?.();
     };
   }, [setUser, setLoading]);
 

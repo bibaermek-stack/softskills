@@ -1,6 +1,6 @@
-// Lightweight client auth/session store. In mock mode it simulates a signed
-// in demo user; when Firebase Auth is configured this would be populated by
-// onAuthStateChanged (wired in AppProviders).
+// Lightweight client auth/session store. In mock mode it simulates a signed-in
+// demo user; with Supabase configured AuthProvider keeps it synchronized with
+// onAuthStateChange.
 "use client";
 import { create } from "zustand";
 import type { AppUser } from "./types";

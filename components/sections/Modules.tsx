@@ -195,31 +195,25 @@ export function Modules() {
                     </ul>
                   </div>
 
-                  {/*
-                    Осы пәннің сипаттамасынан оның нақты интерактивті сабағына
-                    көпір: ойын, симуляция және тест сол жерде ашылады.
-                  */}
-                  {activeLesson ? (
+                  <div className="mt-5 grid gap-2.5 sm:grid-cols-2">
                     <Link
-                      href={`/dashboard/lessons/${activeLesson.id}`}
-                      className="group mt-4 flex items-center gap-3 rounded-2xl p-5 text-white transition-transform duration-300 hover:scale-[1.01]"
+                      href={`/dashboard/quiz/${active.id}`}
+                      className="group flex items-center justify-between gap-3 rounded-2xl p-4.5 text-white shadow-soft transition-transform duration-300 hover:scale-[1.02]"
                       style={{ backgroundColor: active.accent }}
                     >
                       <span className="min-w-0 flex-1">
-                        <span className="block text-[0.66rem] font-semibold tracking-[0.12em] uppercase opacity-75">
-                          Интерактивті сабақ
+                        <span className="block text-[0.66rem] font-semibold tracking-[0.12em] uppercase opacity-85">
+                          Жағдаяттық викторина
                         </span>
-                        <span className="mt-1 block text-[0.95rem] font-semibold">
-                          «{activeLesson.title}»
+                        <span className="mt-0.5 block text-[0.92rem] font-bold">
+                          {active.name}: 200 тесттен өту
                         </span>
-                        <span className="mt-0.5 block text-[0.78rem] opacity-85">
-                          {GAME_KIND_LABEL[activeLesson.stages.activity.game.kind]} ·{" "}
-                          {activeLesson.stages.assessment.quiz.questions.length} сұрақтық тест
-                          {activeLesson.stages.resources.sim ? " · симуляция" : ""}
+                        <span className="mt-0.5 block text-[0.74rem] opacity-90">
+                          Soft Skills диагностикасы & араластыру
                         </span>
                       </span>
                       <svg
-                        className="size-5 shrink-0 transition-transform duration-300 group-hover:translate-x-0.5"
+                        className="size-5 shrink-0 transition-transform duration-300 group-hover:translate-x-1"
                         viewBox="0 0 16 16"
                         fill="none"
                         aria-hidden
@@ -233,7 +227,40 @@ export function Modules() {
                         />
                       </svg>
                     </Link>
-                  ) : null}
+
+                    {activeLesson ? (
+                      <Link
+                        href={`/dashboard/lessons/${activeLesson.id}`}
+                        className="group flex items-center justify-between gap-3 rounded-2xl border border-ink-700/10 bg-white p-4.5 text-ink-900 transition-all duration-300 hover:shadow-soft hover:scale-[1.02] dark:border-white/10 dark:bg-white/5 dark:text-white"
+                      >
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-[0.66rem] font-semibold tracking-[0.12em] uppercase text-ink-600/70 dark:text-paper-300">
+                            Интерактивті сабақ
+                          </span>
+                          <span className="mt-0.5 block text-[0.92rem] font-bold">
+                            «{activeLesson.title}»
+                          </span>
+                          <span className="mt-0.5 block text-[0.74rem] text-ink-600/80 dark:text-paper-300">
+                            {GAME_KIND_LABEL[activeLesson.stages.activity.game.kind]} · симуляция
+                          </span>
+                        </span>
+                        <svg
+                          className="size-5 shrink-0 text-ink-500 transition-transform duration-300 group-hover:translate-x-1 dark:text-paper-300"
+                          viewBox="0 0 16 16"
+                          fill="none"
+                          aria-hidden
+                        >
+                          <path
+                            d="M3 8h10M8.5 3.5 13 8l-4.5 4.5"
+                            stroke="currentColor"
+                            strokeWidth="1.6"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </Link>
+                    ) : null}
+                  </div>
                 </div>
               </motion.div>
             </AnimatePresence>

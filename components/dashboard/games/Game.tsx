@@ -3,11 +3,18 @@
 import { useRef } from "react";
 import type { GameSpec } from "@/lib/lessons";
 import type { SubjectId } from "@/lib/dashboard";
+import type { GameType } from "@/lib/types";
 import { saveRecord } from "@/lib/progress";
 import { MatchGame } from "./MatchGame";
 import { OrderGame } from "./OrderGame";
 import { CategorizeGame } from "./CategorizeGame";
 import type { GameResult } from "./GameFrame";
+
+const LMS_GAME_TYPE: Record<GameSpec["kind"], GameType> = {
+  match: "matching",
+  order: "sorting",
+  categorize: "dragdrop",
+};
 
 /**
  * Ойын түрін таңдап, нәтижесін сақтайтын қабат.
@@ -44,6 +51,7 @@ export function Game({
       total: result.total,
       attempts: result.attempts,
       durationMs: result.durationMs,
+      gameType: LMS_GAME_TYPE[spec.kind],
       at: Date.now(),
     });
   };

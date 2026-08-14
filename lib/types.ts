@@ -1,5 +1,5 @@
 // Core domain types shared across the app.
-// Comments are in English per project convention; all UI-facing strings live in src/data (Kazakh).
+// Comments are in English per project convention; UI-facing strings are in data/ and lib/ (Kazakh).
 
 export type UserRole = "student" | "teacher" | "admin";
 
@@ -15,7 +15,7 @@ export interface AppUser {
   /**
    * False only between an OAuth signup and the moment its owner picks a role.
    * A Google sign-in has no form to carry the choice, so the profile starts
-   * provisional and `/auth/callback` asks. Everything else is born locked.
+   * provisional and the dashboard asks. Everything else is born locked.
    */
   roleLocked?: boolean;
   createdAt: string;
@@ -145,7 +145,11 @@ export interface QuizAttempt {
   userId: string;
   score: number; // out of 10
   total: number;
-  answers: (number | { questionId: string; chosenIndex: number; correct: boolean })[];
+  answers: (
+    | number
+    | { questionId: string; chosenIndex: number; correct: boolean }
+    | { questionId: string; chosenIndices: number[]; correct: boolean }
+  )[];
   takenAt: string;
 }
 

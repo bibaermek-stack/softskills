@@ -10,6 +10,7 @@
 // source yet, the field is null and the page says so.
 
 import { ALL_MODULES } from "@/data/modules";
+import { lessons } from "./lessons";
 import {
   getAnalyticsSnapshot,
   getAssignmentSubmissions,
@@ -24,7 +25,7 @@ import type { FinalGradeBreakdown, FinalGradeResult } from "./types";
 const PASS = 60;
 
 export interface StudentStats {
-  /** Best quiz % per lesson, module order. null = never attempted. */
+  /** Best quiz % per known module, followed by any slug-based lesson attempts. */
   lessonScores: (number | null)[];
   attempted: number;
   completed: number;
@@ -68,13 +69,23 @@ export async function loadStudentStats(userId: string): Promise<StudentStats> {
   ]);
 
   // Best rather than latest attempt: a retake after revision should count.
-  const best = new Map<number | string, number>();
+  const best = new Map<string, number>();
   for (const a of attempts) {
     const pct = a.total > 0 ? Math.round((a.score / a.total) * 100) : 0;
-    const prev = best.get(a.moduleId);
-    if (prev === undefined || pct > prev) best.set(a.moduleId, pct);
+    const moduleId = String(a.moduleId);
+    const prev = best.get(moduleId);
+    if (prev === undefined || pct > prev) best.set(moduleId, pct);
   }
-  const lessonScores = ALL_MODULES.map((m) => best.get(m.id) ?? null);
+  const knownLessonIds = [
+    ...ALL_MODULES.map((module) => String(module.id)),
+    ...lessons.map((lesson) => lesson.id),
+  ];
+  const knownIdSet = new Set(knownLessonIds);
+  const additionalLessonIds = [...best.keys()].filter((id) => !knownIdSet.has(id));
+  const lessonScores = [
+    ...knownLessonIds.map((id) => best.get(id) ?? null),
+    ...additionalLessonIds.map((id) => best.get(id) ?? null),
+  ];
   const scored = lessonScores.filter((s): s is number => s !== null);
   const completed = scored.filter((s) => s >= PASS).length;
 
@@ -123,7 +134,9 @@ export async function loadStudentStats(userId: string): Promise<StudentStats> {
     lessonScores,
     attempted: scored.length,
     completed,
-    progressPercent: Math.round((completed / ALL_MODULES.length) * 100),
+    progressPercent: Math.round(
+      (completed / (knownLessonIds.length + additionalLessonIds.length)) * 100
+    ),
     quizAverage,
     gameAverage,
     assignmentAverage,

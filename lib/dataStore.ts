@@ -57,7 +57,7 @@ function live() {
 // ---------------------------------------------------------------------------
 // Users / Auth profile
 //
-// Profiles live in Supabase and are handled by src/lib/supabase/accounts.ts;
+// Profiles live in Supabase and are handled by lib/supabase/accounts.ts;
 // these two remain for the localStorage demo path only.
 // ---------------------------------------------------------------------------
 export async function getCurrentUserProfile(uidValue: string): Promise<AppUser | null> {
@@ -91,7 +91,10 @@ export async function saveQuizAttempt(attempt: QuizAttempt): Promise<void> {
   lsSet("quizAttempts", attempts);
 }
 
-export async function getQuizAttempts(userId: string, moduleId?: number): Promise<QuizAttempt[]> {
+export async function getQuizAttempts(
+  userId: string,
+  moduleId?: number | string
+): Promise<QuizAttempt[]> {
   if (live()) {
     let q = supabase!
       .from("quiz_attempts")

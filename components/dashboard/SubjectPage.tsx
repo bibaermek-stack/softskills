@@ -127,6 +127,47 @@ export function SubjectPage({ id }: { id: SubjectId }) {
         </div>
       </header>
 
+      {/* 200 Жағдаяттық тест викторинасының банері */}
+      <section
+        className="dash-card relative overflow-hidden rounded-2xl p-5 sm:p-6"
+        style={{
+          backgroundImage: `linear-gradient(135deg, color-mix(in srgb, ${subject.accent} 15%, transparent), transparent 70%)`,
+        }}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="max-w-2xl">
+            <div className="flex items-center gap-2">
+              <span
+                className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[0.7rem] font-bold text-white uppercase tracking-wider"
+                style={{ backgroundColor: subject.accent }}
+              >
+                <Icon name="Award" className="size-3" />
+                200 Жағдаяттық тест
+              </span>
+              <span className="text-[0.74rem] font-semibold text-emerald-600 dark:text-emerald-400">
+                • Әр кіргенде кездейсоқ араласады
+              </span>
+            </div>
+            <h2 className="mt-2 font-display text-lg font-bold text-ink-900 sm:text-xl dark:text-white">
+              {subject.name} пәні бойынша икемді дағдылар викторинасы
+            </h2>
+            <p className="mt-1 text-[0.84rem] text-ink-700 dark:text-paper-200">
+              Сыни ойлау, мәселе шешу, шығармашылық және шешім қабылдауға арналған 200 тест
+              тапсырмасынан өтіп, жеке Soft Skills картаңызды алыңыз.
+            </p>
+          </div>
+
+          <Link
+            href={`/dashboard/quiz/${subject.id}`}
+            className="flex items-center gap-2 rounded-xl px-5 py-3 font-display text-[0.85rem] font-bold text-white shadow-lift transition-transform hover:scale-[1.02] active:scale-[0.98]"
+            style={{ backgroundColor: subject.accent }}
+          >
+            <Icon name="CirclePlay" className="size-4" strokeWidth={2.2} />
+            Викторинадан өту (200 сұрақ)
+          </Link>
+        </div>
+      </section>
+
       {/* Виртуалды зертхана */}
       <PageSection title="Виртуалды зертхана" icon="FlaskConical" accent={subject.accent}>
         <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">

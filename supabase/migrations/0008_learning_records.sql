@@ -44,7 +44,7 @@ create table if not exists public.quiz_attempts (
   module_id  integer not null,
   score      integer not null,
   total      integer not null,
-  -- [{ questionId, chosenIndex, correct }]
+  -- [{ questionId, chosenIndices, correct }]
   answers    jsonb not null default '[]'::jsonb,
   taken_at   timestamptz not null default now(),
   constraint quiz_attempts_score check (score >= 0 and total > 0 and score <= total)

@@ -8,6 +8,7 @@ import {
   signUp,
   signInWithGoogle,
   signInAsDemo,
+  claimRole,
 } from "@/lib/supabase/accounts";
 import type { UserRole } from "@/lib/types";
 
@@ -28,7 +29,9 @@ export function AuthModal({ isOpen, onClose, initialTab = "signin" }: AuthModalP
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const currentUser = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
+  const mustClaimRole = currentUser?.roleLocked === false;
 
   if (!isOpen) return null;
 
@@ -106,6 +109,85 @@ export function AuthModal({ isOpen, onClose, initialTab = "signin" }: AuthModalP
     setUser(user);
     onClose();
   };
+
+  const handleClaimRole = async () => {
+    setErrorMsg(null);
+    setLoading(true);
+    try {
+      const user = await claimRole(role);
+      if (!user) throw new Error("Профиль табылмады. Қайта кіріп көріңіз.");
+      setUser(user);
+      onClose();
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : "Рөлді сақтау кезінде қате орын алды.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (mustClaimRole) {
+    return (
+      <AnimatePresence>
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4 sm:p-6">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-950/70 backdrop-blur-md"
+          />
+          <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="role-picker-title"
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            className="relative w-full max-w-md rounded-3xl border border-white/20 bg-slate-900/90 p-6 text-white shadow-2xl backdrop-blur-xl sm:p-8"
+          >
+            <h2 id="role-picker-title" className="text-xl font-bold tracking-tight">
+              Рөліңізді таңдаңыз
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-slate-300">
+              Google тіркелгісін аяқтау үшін рөлді бір рет таңдаңыз. Кейін оны өзгерту мүмкін емес.
+            </p>
+
+            <div className="mt-5 grid grid-cols-2 gap-2">
+              {(["student", "teacher"] as const).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setRole(value)}
+                  aria-pressed={role === value}
+                  className={`rounded-xl border px-3 py-3 text-sm font-medium transition ${
+                    role === value
+                      ? "border-brand-400 bg-brand-500/20 text-brand-200"
+                      : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
+                  }`}
+                >
+                  {value === "student" ? "🎓 Студент" : "👨‍🏫 Оқытушы"}
+                </button>
+              ))}
+            </div>
+
+            {errorMsg && (
+              <div role="alert" className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300">
+                ⚠️ {errorMsg}
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={handleClaimRole}
+              disabled={loading}
+              className="mt-5 w-full rounded-xl bg-linear-to-r from-brand-500 to-indigo-600 py-3 text-sm font-semibold text-white transition disabled:opacity-50"
+            >
+              {loading ? "Сақталуда..." : "Рөлді бекіту"}
+            </button>
+          </motion.div>
+        </div>
+      </AnimatePresence>
+    );
+  }
 
   return (
     <AnimatePresence>

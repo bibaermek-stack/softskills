@@ -1,13 +1,14 @@
 // Turns one student's own activity into a personal "what to do next" plan —
 // the same idea as the teacher's cohort-wide recommendations
-// (src/data/recommendations.ts), but built from that student's real quiz
-// attempts and assignment submissions (via dataStore, so it works against
-// either localStorage mock data or a real Firestore backend without change)
-// rather than the synthetic class-wide dataset in src/data/cohort.ts. A
+// (data/recommendations.ts), but built from that student's real quiz attempts
+// and assignment submissions (via dataStore, so it works against either the
+// localStorage mock or Supabase without change) rather than the synthetic
+// class-wide dataset in data/cohort.ts. A
 // student must never be shown numbers that do not match their own dashboard.
 
-import { ALL_MODULES, getModuleById } from "@/data/modules";
+import { ALL_MODULES } from "@/data/modules";
 import { getSimulation } from "@/data/simulations";
+import { lessons } from "./lessons";
 import { getAssignmentSubmissions, getGameResults, getQuizAttempts } from "./dataStore";
 import type { ActionItem } from "./types";
 
@@ -18,19 +19,39 @@ const CRITICAL_THRESHOLD = 50;
 
 const ORDER = { critical: 0, warning: 1, info: 2 } as const;
 
+const PLAN_UNITS = [
+  ...ALL_MODULES.map((module) => ({
+    id: String(module.id),
+    title: module.title,
+    href: `/modules/${module.id}`,
+    simulationHref: `/modules/${module.id}?tab=simulation`,
+    legacyModuleId: module.id,
+  })),
+  ...lessons.map((lesson) => ({
+    id: lesson.id,
+    title: lesson.title,
+    href: `/dashboard/lessons/${lesson.id}`,
+    simulationHref: lesson.stages.resources.sim
+      ? `/dashboard/simulations/${lesson.stages.resources.sim}`
+      : null,
+    legacyModuleId: null,
+  })),
+];
+
 /**
  * Best quiz score (%) per lesson, in module order. `null` = not attempted.
  * "Best" rather than "latest" so a retake after review counts for the student.
  */
 export async function studentLessonScores(userId: string): Promise<(number | null)[]> {
   const attempts = await getQuizAttempts(userId);
-  const best = new Map<number | string, number>();
+  const best = new Map<string, number>();
   for (const a of attempts) {
     const pct = a.total > 0 ? Math.round((a.score / a.total) * 100) : 0;
-    const prev = best.get(a.moduleId);
-    if (prev === undefined || pct > prev) best.set(a.moduleId, pct);
+    const moduleId = String(a.moduleId);
+    const prev = best.get(moduleId);
+    if (prev === undefined || pct > prev) best.set(moduleId, pct);
   }
-  return ALL_MODULES.map((m) => best.get(m.id) ?? null);
+  return PLAN_UNITS.map((unit) => best.get(unit.id) ?? null);
 }
 
 export async function buildStudentPlan(userId: string): Promise<ActionItem[]> {
@@ -44,18 +65,21 @@ export async function buildStudentPlan(userId: string): Promise<ActionItem[]> {
 
   // 1. Lessons already attempted but scored low — worth revising first.
   const weak = scores
-    .map((pct, i) => ({ pct, id: ALL_MODULES[i].id, title: ALL_MODULES[i].title }))
-    .filter((x): x is { pct: number; id: number; title: string } => x.pct !== null && x.pct < WEAK_THRESHOLD)
+    .map((pct, i) => ({ pct, unit: PLAN_UNITS[i] }))
+    .filter(
+      (item): item is { pct: number; unit: (typeof PLAN_UNITS)[number] } =>
+        item.pct !== null && item.pct < WEAK_THRESHOLD
+    )
     .sort((a, b) => a.pct - b.pct);
   for (const w of weak.slice(0, 3)) {
     items.push({
-      id: `weak-${w.id}`,
+      id: `weak-${w.unit.id}`,
       severity: w.pct < CRITICAL_THRESHOLD ? "critical" : "warning",
       kind: "Қайталау",
-      title: `«${w.title}» тақырыбын қайталау керек`,
+      title: `«${w.unit.title}» тақырыбын қайталау керек`,
       evidence: `Викторинадағы ең жақсы нәтижең: ${w.pct}%.`,
       action: "Дәрісті қайта қара, глоссарийді пысықта да, викторинаны қайта тапсыр.",
-      href: `/modules/${w.id}`,
+      href: w.unit.href,
     });
   }
 
@@ -63,15 +87,15 @@ export async function buildStudentPlan(userId: string): Promise<ActionItem[]> {
   const attemptedCount = scores.filter((s) => s !== null).length;
   const nextIndex = scores.findIndex((s) => s === null);
   if (nextIndex !== -1) {
-    const next = ALL_MODULES[nextIndex];
+    const next = PLAN_UNITS[nextIndex];
     items.push({
       id: "next-lesson",
       severity: "info",
       kind: "Жалғастыру",
       title: attemptedCount === 0 ? "Курсты бастау уақыты келді" : `Келесі сабақ: «${next.title}»`,
-      evidence: `${attemptedCount}/${ALL_MODULES.length} сабақтың викторинасын тапсырдың.`,
+      evidence: `${attemptedCount}/${PLAN_UNITS.length} сабақтың викторинасын тапсырдың.`,
       action: "Дәрісті қара, 3D симуляцияны сынап көр, содан кейін викторинаны тапсыр.",
-      href: `/modules/${next.id}`,
+      href: next.href,
     });
   }
 
@@ -81,35 +105,40 @@ export async function buildStudentPlan(userId: string): Promise<ActionItem[]> {
   //    that quietly omits them. It points at the weakest attempted lesson
   //    first — running the experiment is the fastest way to fix a bad score —
   //    and otherwise at wherever the student currently is.
-  const simTarget = weak[0]?.id ?? ALL_MODULES[Math.max(0, nextIndex)]?.id ?? ALL_MODULES[0].id;
-  const sim = getSimulation(simTarget);
-  if (sim) {
-    const mod = getModuleById(simTarget);
+  const simUnit = weak[0]?.unit ?? PLAN_UNITS[Math.max(0, nextIndex)] ?? PLAN_UNITS[0];
+  const legacySim = simUnit.legacyModuleId
+    ? getSimulation(simUnit.legacyModuleId)
+    : null;
+  if (simUnit.simulationHref) {
     items.push({
-      id: `simulation-${simTarget}`,
+      id: `simulation-${simUnit.id}`,
       severity: "info",
       kind: "3D тәжірибе",
-      title: `«${sim.title}» симуляциясын жаса`,
+      title: legacySim
+        ? `«${legacySim.title}» симуляциясын жаса`
+        : `«${simUnit.title}» интерактив тәжірибесін жаса`,
       evidence: weak[0]
-        ? `«${mod?.title ?? ""}» бойынша ұпайың ${weak[0].pct}% — тәжірибе ұғымды бекітеді.`
-        : `${sim.devices.join(", ")} қолданылады, шамамен ${sim.minutes} минут.`,
-      action: sim.subtitle,
-      href: `/modules/${simTarget}?tab=simulation`,
+        ? `«${simUnit.title}» бойынша ұпайың ${weak[0].pct}% — тәжірибе ұғымды бекітеді.`
+        : legacySim
+          ? `${legacySim.devices.join(", ")} қолданылады, шамамен ${legacySim.minutes} минут.`
+          : "Интерактив тәжірибе сабақтағы ұғымдарды іс жүзінде бекітеді.",
+      action: legacySim?.subtitle ?? "Параметрлерді өзгертіп, нәтижені салыстырып көр.",
+      href: simUnit.simulationHref,
     });
   }
 
   // 4. Games the student has not tried on their current lesson.
-  const playedModules = new Set(games.map((g) => g.moduleId));
-  const gameTarget = nextIndex !== -1 ? ALL_MODULES[Math.max(0, nextIndex - 1)]?.id : undefined;
-  if (gameTarget && attemptedCount > 0 && !playedModules.has(gameTarget)) {
+  const playedModules = new Set(games.map((g) => String(g.moduleId)));
+  const gameTarget = nextIndex !== -1 ? PLAN_UNITS[Math.max(0, nextIndex - 1)] : undefined;
+  if (gameTarget && attemptedCount > 0 && !playedModules.has(gameTarget.id)) {
     items.push({
-      id: `games-${gameTarget}`,
+      id: `games-${gameTarget.id}`,
       severity: "info",
       kind: "Ойын",
       title: "Терминдерді ойынмен бекіт",
       evidence: "Бұл сабақтың ойындарын әлі ойнамағансың.",
       action: "Кроссворд, сөз табу немесе жылдам жауап — глоссарийді жаттауға көмектеседі.",
-      href: `/modules/${gameTarget}?tab=game`,
+      href: `${gameTarget.href}?tab=game`,
     });
   }
 
@@ -131,15 +160,15 @@ export async function buildStudentPlan(userId: string): Promise<ActionItem[]> {
     (s) => s.status === "reviewed" && typeof s.grade === "number" && s.grade < WEAK_THRESHOLD
   );
   for (const s of lowGraded.slice(0, 2)) {
-    const mod = getModuleById(Number(s.moduleId));
+    const unit = PLAN_UNITS.find((item) => item.id === String(s.moduleId));
     items.push({
       id: `low-grade-${s.id}`,
       severity: "warning",
       kind: "БӨЖ",
-      title: mod ? `«${mod.title}» тапсырмасын жақсарту керек` : "БӨЖ тапсырмасын жақсарту керек",
+      title: unit ? `«${unit.title}» тапсырмасын жақсарту керек` : "БӨЖ тапсырмасын жақсарту керек",
       evidence: `Баға: ${s.grade}%.${s.teacherFeedback ? " Оқытушы пікір қалдырды." : ""}`,
       action: "Оқытушының ескертуін оқы да, тапсырманы қайта тапсыр.",
-      href: mod ? `/modules/${mod.id}` : undefined,
+      href: unit?.href,
     });
   }
 

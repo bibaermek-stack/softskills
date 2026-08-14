@@ -83,10 +83,10 @@ const SEARCH_DATABASE: SearchItem[] = [
 
 export function GlobalSearchModal({
   isOpen,
-  onClose,
+  onCloseAction,
 }: {
   isOpen: boolean;
-  onClose: () => void;
+  onCloseAction: () => void;
 }) {
   const [query, setQuery] = useState("");
 
@@ -96,18 +96,18 @@ export function GlobalSearchModal({
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         if (isOpen) {
-          onClose();
+          onCloseAction();
         } else {
           window.dispatchEvent(new CustomEvent("open-global-search"));
         }
       }
       if (e.key === "Escape" && isOpen) {
-        onClose();
+        onCloseAction();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, onCloseAction]);
 
   const filtered = query.trim()
     ? SEARCH_DATABASE.filter(
@@ -127,7 +127,7 @@ export function GlobalSearchModal({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={onClose}
+            onClick={onCloseAction}
             className="fixed inset-0 bg-slate-950/70 backdrop-blur-md"
           />
 
@@ -151,7 +151,7 @@ export function GlobalSearchModal({
                 className="w-full bg-transparent text-sm text-white placeholder-slate-400 focus:outline-none"
               />
               <button
-                onClick={onClose}
+                onClick={onCloseAction}
                 className="rounded-lg p-1 text-slate-400 hover:bg-white/10 hover:text-white cursor-pointer"
               >
                 <Icon name="X" className="size-5" />
@@ -159,7 +159,7 @@ export function GlobalSearchModal({
             </div>
 
             {/* Search Results */}
-            <div className="dash-scroll max-h-[22rem] overflow-y-auto p-2">
+            <div className="dash-scroll max-h-88 overflow-y-auto p-2">
               <div className="px-3 py-1.5 text-[0.7rem] font-semibold text-slate-400">
                 {query ? `Табылған нәтижелер (${filtered.length})` : "Ұсынылатын тақырыптар"}
               </div>
@@ -174,7 +174,7 @@ export function GlobalSearchModal({
                     <Link
                       key={item.id}
                       href={item.href}
-                      onClick={onClose}
+                      onClick={onCloseAction}
                       className="flex items-center justify-between rounded-xl p-3 transition hover:bg-white/10 group cursor-pointer"
                     >
                       <div>

@@ -157,7 +157,11 @@ export interface GameResult {
   id: string;
   moduleId: number | string;
   userId: string;
-  gameType: GameType;
+  /**
+   * Сабақ ойындарының түрі, немесе `"roleplay"` — кейстің рөлдік ойыны.
+   * Ол `GameType` тізіміне кірмейді: кейс сабаққа емес, дағдыға байланған.
+   */
+  gameType: GameType | "roleplay";
   score: number; // 0-100
   completedAt: string;
 }

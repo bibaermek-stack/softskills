@@ -22,7 +22,7 @@ const STORAGE_KEY = "vstem-progress-v1";
 const PROGRESS_EVENT = "vstem:progress";
 const MAX_RECORDS = 200;
 
-export type ActivityKind = "quiz" | "game" | "sim";
+export type ActivityKind = "quiz" | "game" | "sim" | "case";
 
 export type ProgressRecord = {
   /** Тест/ойын/симуляция идентификаторы. */
@@ -39,6 +39,14 @@ export type ProgressRecord = {
   durationMs: number;
   /** Supabase analytics uses the shared LMS game taxonomy. */
   gameType?: GameType;
+  /**
+   * Осы әрекет дамытатын дағдылар — радар осыларды қосады.
+   *
+   * Сабақта дағды `lessons`-тан табылады, ал кейс пәнге де, сабаққа да
+   * байланбайды. Сондықтан кейс өз дағдыларын жазбаның өзіне жазады: радар
+   * оларды іздеп жүрмейді, әрі кейс атауы өзгерсе де ескі жазба дұрыс қалады.
+   */
+  skills?: string[];
   /** Per-question selections retained for review and question-level analytics. */
   quizAnswers?: QuizAttempt["answers"];
   /** Аяқталған уақыты. */
@@ -59,7 +67,7 @@ function isRecord(value: unknown): value is ProgressRecord {
   return (
     typeof r.id === "string" &&
     typeof r.at === "number" &&
-    (r.kind === "quiz" || r.kind === "game" || r.kind === "sim") &&
+    (r.kind === "quiz" || r.kind === "game" || r.kind === "sim" || r.kind === "case") &&
     (typeof r.score === "number" || r.score === null)
   );
 }
@@ -102,6 +110,7 @@ function writeProgress(state: ProgressState): void {
 }
 
 async function persistRecord(record: ProgressRecord): Promise<void> {
+  // Симуляцияда бағаланатын нәтиже жоқ — ол тек тәжірибе алаңы.
   if (!isSupabaseConfigured || !supabase || record.kind === "sim") return;
 
   const profile = useAuthStore.getState().user;
@@ -126,6 +135,18 @@ async function persistRecord(record: ProgressRecord): Promise<void> {
       total: record.total,
       answers: record.quizAnswers ?? [],
       takenAt: occurredAt,
+    });
+  } else if (record.kind === "case") {
+    // Кейсте бағаланатын жалғыз нәрсе — рөлдік ойын. Ойналмаса (дос жоқ,
+    // өткізіп жіберілді) `score` бос болады да, жіберетін нәтиже де болмайды.
+    if (record.score === null) return;
+    await saveGameResult({
+      id: eventId,
+      userId: profile.uid,
+      moduleId: record.lessonId,
+      gameType: "roleplay",
+      score: record.score,
+      completedAt: occurredAt,
     });
   } else if (record.gameType) {
     await saveGameResult({
@@ -234,10 +255,12 @@ export function skillProfile(state: ProgressState): { axis: string; value: numbe
 
   for (const record of state.records) {
     if (record.score === null) continue;
-    const lesson = lessons.find((item) => item.id === record.lessonId);
-    if (!lesson) continue;
+    // Жазбаның өз дағдысы бірінші: кейс сабақ тізімінде жоқ, сондықтан
+    // `lessons`-пен ғана шектелсек, кейстің нәтижесі радарға жетпей қалады.
+    const axes = record.skills ?? lessons.find((item) => item.id === record.lessonId)?.skills;
+    if (!axes?.length) continue;
 
-    for (const axis of lesson.skills) {
+    for (const axis of axes) {
       const entry = sums.get(axis) ?? { total: 0, count: 0 };
       entry.total += record.score;
       entry.count += 1;

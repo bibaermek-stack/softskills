@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import type { CaseTask } from "@/lib/caseTasks";
 import { saveRecord } from "@/lib/progress";
+import { useAuthStore } from "@/lib/authStore";
+import { saveCaseResponse } from "@/lib/supabase/caseResponses";
 import { usePrefersReducedMotion } from "@/lib/hooks";
 import { Icon } from "./Icon";
 import { Chip } from "./Panel";
@@ -32,9 +34,11 @@ type CaseState = {
   answer: string;
   /** Рөлдік ойын өткізіп жіберілді ме. */
   skipped: boolean;
+  /** Рөлдік ойынның нәтижесі. Ойналмаса — null, сонда баға да қойылмайды. */
+  play: { correct: number; total: number } | null;
 };
 
-const EMPTY: CaseState = { step: "video", done: [], answer: "", skipped: false };
+const EMPTY: CaseState = { step: "video", done: [], answer: "", skipped: false, play: null };
 
 /**
  * Қадам күйін браузерде сақтау. Кейс сабақ плеерінің бір қойындысында тұр —
@@ -52,6 +56,10 @@ function readState(caseId: string): CaseState {
       done: Array.isArray(parsed.done) ? parsed.done.filter(known) : [],
       answer: typeof parsed.answer === "string" ? parsed.answer : "",
       skipped: parsed.skipped === true,
+      play:
+        parsed.play && typeof parsed.play.total === "number" && parsed.play.total > 0
+          ? parsed.play
+          : null,
     };
   } catch {
     return EMPTY;
@@ -88,6 +96,7 @@ export function CaseTaskPlayer({ caseTask }: { caseTask: CaseTask }) {
   const [hydrated, setHydrated] = useState(false);
   const startedAt = useRef(Date.now());
   const reduced = usePrefersReducedMotion();
+  const me = useAuthStore((s) => s.user);
 
   useEffect(() => {
     setState(readState(caseTask.id));
@@ -114,27 +123,63 @@ export function CaseTaskPlayer({ caseTask }: { caseTask: CaseTask }) {
       const done = state.done.includes(id) ? state.done : [...state.done, id];
       update({ done, step: nextStep ?? state.step });
 
+      // Жазба жауапты мұғалім көретін жерге жіберу. Тапсырма қадамы біткенде
+      // бір рет, кейс аяқталғанда ойын нәтижесімен бірге тағы бір рет — оқушы
+      // ойынға жетпей тоқтап қалса да, жауабы жоғалмайды.
+      if ((id === "task" || id === "discussion") && me) {
+        void saveCaseResponse(me, {
+          caseId: caseTask.id,
+          answer: state.answer,
+          play: state.play,
+          skipped: state.skipped,
+        });
+      }
+
       if (id === "discussion") {
+        // Бағаланатын жалғыз нәрсе — рөлдік ойын. Ол өткізіп жіберілсе,
+        // өлшенген ештеңе жоқ, сондықтан баға да қойылмайды (радар мұндай
+        // жазбаны елемейді) — қадамдардың саны баға бола алмайды.
+        const play = state.play;
         saveRecord({
           id: caseTask.id,
-          kind: "sim",
+          kind: "case",
           lessonId: caseTask.id,
           // Кейс пәнге бөлінбейді — аналитикада ол жалпы дағды жазбасы.
           subject: "general",
           stage: "case",
-          score: null,
-          correct: done.length,
-          total: STEPS.length,
+          score: play ? Math.round((play.correct / play.total) * 100) : null,
+          correct: play?.correct ?? 0,
+          total: play?.total ?? 0,
           attempts: 1,
           durationMs: Date.now() - startedAt.current,
+          skills: caseTask.skills,
           at: Date.now(),
         });
       }
     },
-    [state.done, state.step, update, caseTask.id],
+    [
+      state.done,
+      state.step,
+      state.play,
+      state.answer,
+      state.skipped,
+      update,
+      me,
+      caseTask.id,
+      caseTask.skills,
+    ],
   );
 
   const index = STEPS.findIndex((s) => s.id === state.step);
+  const handlePlayResult = useCallback(
+    (result: { correct: number; total: number }) => {
+      // Раунд өтпей аяқталған бөлме нәтиже бермейді — бос нәтижені бағаға
+      // айналдырсақ, оқушы ойнамай-ақ 0 алар еді.
+      if (result.total > 0) update({ play: result, skipped: false });
+    },
+    [update],
+  );
+
   const answerReady = state.answer.trim().length >= caseTask.task.minChars;
   const finished = state.done.includes("discussion");
 
@@ -373,6 +418,7 @@ export function CaseTaskPlayer({ caseTask }: { caseTask: CaseTask }) {
                 roles={caseTask.roleplay.roles}
                 rounds={caseTask.roleplay.rounds}
                 accent={accent}
+                onResult={handlePlayResult}
               />
 
               <p className="mt-3 rounded-lg border border-dashed border-ink-700/15 px-3 py-2.5 text-[0.76rem] leading-snug text-ink-700/85 dark:border-white/15 dark:text-paper-300">
@@ -418,9 +464,27 @@ export function CaseTaskPlayer({ caseTask }: { caseTask: CaseTask }) {
             hint="Сыныпта ауызша талқыланады — әр сұраққа бірнеше жауап болуы қалыпты."
             accent={accent}
           >
-            {state.skipped ? (
+            {state.play ? (
+              <p className="mb-3 flex flex-wrap items-baseline gap-x-2 rounded-lg px-3 py-2.5 text-[0.78rem]"
+                style={{ backgroundColor: `color-mix(in srgb, ${accent} 10%, transparent)` }}
+              >
+                <span
+                  className="font-display text-[1.05rem] font-black tabular-nums"
+                  style={{ color: accent }}
+                >
+                  {state.play.correct}/{state.play.total}
+                </span>
+                <span className="font-semibold text-ink-800 dark:text-paper-100">
+                  рөлдік ойындағы нәтижеңіз
+                </span>
+                <span className="text-ink-700/75 dark:text-paper-300">
+                  · дағды профиліңізге қосылды
+                </span>
+              </p>
+            ) : state.skipped ? (
               <p className="mb-3 rounded-lg border border-amber-500/25 bg-amber-500/8 px-3 py-2.5 text-[0.76rem] leading-snug text-amber-700 dark:text-amber-300">
-                Рөлдік ойын өткізіп жіберілді. Оны кез келген уақытта қайта ашуға болады.
+                Рөлдік ойын өткізіп жіберілді, сондықтан бұл кейс дағды профиліне баға қоспайды.
+                Оны кез келген уақытта қайта ашуға болады.
               </p>
             ) : null}
 

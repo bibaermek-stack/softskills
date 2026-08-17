@@ -18,6 +18,7 @@ const LS = "mechanics-lms:links";
 const LS_FRIENDS = "mechanics-lms:friendLinks";
 const LS_DUELS = "mechanics-lms:duels";
 const LS_DIR = "mechanics-lms:directory";
+const LS_CASE_RESPONSES = "mechanics-lms:caseResponses";
 
 export interface MockLinkRow {
   id: string;
@@ -226,4 +227,28 @@ export function mockDuels(): MockDuelRow[] {
 
 export function mockSaveDuels(rows: MockDuelRow[]) {
   write(LS_DUELS, rows);
+}
+
+// --- Case responses ---------------------------------------------------------
+
+export interface MockCaseResponseRow {
+  id: string;
+  userId: string;
+  caseId: string;
+  answer: string;
+  playCorrect: number | null;
+  playTotal: number | null;
+  skipped: boolean;
+  submittedAt: string;
+  updatedAt: string;
+  teacherFeedback: string | null;
+  reviewedAt: string | null;
+}
+
+export function mockCaseResponses(): MockCaseResponseRow[] {
+  return read<MockCaseResponseRow[]>(LS_CASE_RESPONSES, []);
+}
+
+export function mockSaveCaseResponses(rows: MockCaseResponseRow[]) {
+  write(LS_CASE_RESPONSES, rows);
 }

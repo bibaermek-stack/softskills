@@ -49,6 +49,7 @@ export function CaseRoleplayRoom({
   rounds,
   accent,
   initialCode,
+  onResult,
 }: {
   caseId: string;
   roles: CaseRole[];
@@ -56,6 +57,8 @@ export function CaseRoleplayRoom({
   accent: string;
   /** QR-код арқылы келгенде — бірден қосылу формасы, коды толтырылған күйде. */
   initialCode?: string;
+  /** Ойын бітіп, осы қатысушының нәтижесі белгілі болғанда бір рет шақырылады. */
+  onResult?: (result: { correct: number; total: number }) => void;
 }) {
   const authUser = useAuthStore((s) => s.user);
   const [mode, setMode] = useState<Mode>(initialCode ? "join" : "closed");
@@ -98,6 +101,23 @@ export function CaseRoleplayRoom({
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ block: "nearest" });
   }, [state?.messages.length]);
+
+  // Ойын біткенде нәтижені бір рет жоғарыға беру. Күй әр хабарламадан кейін
+  // жаңаратындықтан, шектеусіз қалдырсақ, чат жазған сайын қайта жіберілер еді.
+  const reportedRef = useRef(false);
+  useEffect(() => {
+    if (!state || !onResult) return;
+    if (state.phase !== "finished") {
+      reportedRef.current = false;
+      return;
+    }
+    if (reportedRef.current) return;
+    reportedRef.current = true;
+    onResult({
+      correct: state.outcomes.filter((outcome) => outcome.correct[meId]).length,
+      total: state.outcomes.length,
+    });
+  }, [state, meId, onResult]);
 
   const me = state?.members.find((m) => m.id === meId) ?? null;
   const round = rounds[state?.roundIndex ?? 0] ?? rounds[0];

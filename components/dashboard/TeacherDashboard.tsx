@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Icon } from "@/components/dashboard/Icon";
+import { CaseResponseReview } from "./CaseResponseReview";
 
 interface Student {
   id: string;
@@ -133,6 +134,8 @@ export function TeacherDashboard() {
           </table>
         </div>
       </div>
+
+      <CaseResponseReview />
     </div>
   );
 }

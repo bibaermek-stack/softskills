@@ -60,6 +60,7 @@ export function CaseRoleplayRoom({
   const [mode, setMode] = useState<Mode>(initialCode ? "join" : "closed");
   const [engine, setEngine] = useState<CaseRoleplayEngine | null>(null);
   const [state, setState] = useState<RoleplayState | null>(null);
+  const [synced, setSynced] = useState(false);
   const [meId, setMeId] = useState("");
   const [now, setNow] = useState(() => Date.now());
   const [notice, setNotice] = useState("");
@@ -78,8 +79,10 @@ export function CaseRoleplayRoom({
 
   useEffect(() => {
     if (!engine) return;
-    const unsubscribe = engine.subscribe(setState);
-    return unsubscribe;
+    return engine.subscribe((next) => {
+      setState(next);
+      setSynced(engine.isSynced());
+    });
   }, [engine]);
 
   useEffect(() => () => engine?.destroy(), [engine]);
@@ -135,7 +138,6 @@ export function CaseRoleplayRoom({
     };
     const eng = new CaseRoleplayEngine(code, caseId, false, member);
     eng.join(member);
-    eng.requestSync();
     eng.postMessage(systemMessage(`${name} қосылды.`));
     setMeId(member.id);
     setEngine(eng);
@@ -343,6 +345,13 @@ export function CaseRoleplayRoom({
       {notice ? (
         <p className="rounded-lg border border-amber-500/25 bg-amber-500/8 px-3 py-2 text-[0.76rem] font-medium text-amber-700 dark:text-amber-300">
           {notice}
+        </p>
+      ) : null}
+
+      {!synced ? (
+        <p className="flex items-center gap-2 rounded-lg border border-dashed border-ink-700/15 px-3 py-2 text-[0.76rem] text-ink-700/85 dark:border-white/15 dark:text-paper-300">
+          <Icon name="Loader" className="size-3.5 animate-spin" strokeWidth={2.2} />
+          Бөлмеге қосылуда… Код дұрыс екенін және бөлме әлі ашық екенін тексеріңіз.
         </p>
       ) : null}
 

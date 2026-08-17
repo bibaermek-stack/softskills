@@ -30,7 +30,7 @@ export type ProgressRecord = {
   kind: ActivityKind;
   lessonId: string;
   subject: SubjectId | "general";
-  stage: LessonStageId | "sim";
+  stage: LessonStageId | "sim" | "case";
   /** 0–100. Бағаланбайтын әрекетте `null`. */
   score: number | null;
   correct: number;

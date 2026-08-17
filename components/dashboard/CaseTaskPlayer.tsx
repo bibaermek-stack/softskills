@@ -196,16 +196,35 @@ export function CaseTaskPlayer({ caseTask }: { caseTask: CaseTask }) {
               .join(" · ")}
             accent={accent}
           >
-            <div className="overflow-hidden rounded-xl border border-ink-700/10 bg-black dark:border-white/10">
-              <iframe
-                src={`https://www.youtube-nocookie.com/embed/${caseTask.video.youtubeId}`}
-                title={caseTask.video.title}
-                loading="lazy"
-                allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                className="aspect-video w-full"
-              />
-            </div>
+            {caseTask.video.youtubeId ? (
+              <div className="overflow-hidden rounded-xl border border-ink-700/10 bg-black dark:border-white/10">
+                <iframe
+                  src={`https://www.youtube-nocookie.com/embed/${caseTask.video.youtubeId}`}
+                  title={caseTask.video.title}
+                  loading="lazy"
+                  allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  className="aspect-video w-full"
+                />
+              </div>
+            ) : (
+              // Бейне әлі жүктелмеген: кейстің қалған қадамдары жұмыс істей
+              // беруі керек, сондықтан бұл жерде тек орын белгісі тұрады.
+              <div className="flex aspect-video w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-ink-700/20 px-4 text-center dark:border-white/20">
+                <Icon
+                  name="Video"
+                  className="size-7 text-ink-600/40 dark:text-paper-300/60"
+                  strokeWidth={1.8}
+                />
+                <p className="text-[0.82rem] font-semibold text-ink-800 dark:text-paper-100">
+                  Бейне дайындалуда
+                </p>
+                <p className="max-w-sm text-[0.76rem] leading-snug text-ink-700/75 dark:text-paper-300">
+                  Төмендегі сұрақтарды оқып, кейсті бастай беруге болады. Бейне қосылғанда осы
+                  жерде ашылады.
+                </p>
+              </div>
+            )}
 
             <h4 className="mt-3 mb-1.5 text-[0.72rem] font-bold tracking-wide text-ink-700/70 uppercase dark:text-paper-300">
               Бейнеден нені іздейміз

@@ -21,6 +21,15 @@ export interface RoleplayMember {
   roleId: string | null;
   isHost: boolean;
   joinedAt: number;
+  /** Дұрыс жауаптардан жиналған ұпай. */
+  score: number;
+}
+
+/** Бір раундтың нәтижесі — соңғы экранда осылар қосылады. */
+export interface RoundOutcome {
+  roundIndex: number;
+  /** Қатысушы id → сол раундта дұрыс жауап берді ме. */
+  correct: Record<string, boolean>;
 }
 
 export interface RoleplayMessage {
@@ -44,8 +53,17 @@ export interface RoleplayState {
   endsAt: number | null;
   /** Таймер тұрған кездегі қалған секунд. */
   pausedLeft: number | null;
+  /** Ағымдағы раундтағы жауаптар: қатысушы id → таңдаған нұсқасы. */
+  answers: Record<string, number>;
+  /** Дұрыс жауап пен түсіндірме ашылды ма. */
+  revealed: boolean;
+  /** Өткен раундтардың қорытындысы. */
+  outcomes: RoundOutcome[];
   messages: RoleplayMessage[];
 }
+
+/** Бір дұрыс жауаптың құны. */
+export const POINTS_PER_CORRECT = 10;
 
 export const ROLEPLAY_AVATARS = [
   "🦊",

@@ -19,7 +19,12 @@
  */
 
 import { isSupabaseConfigured, supabase } from "./client";
-import type { RoleplayMember, RoleplayMessage, RoleplayState } from "@/lib/caseRoleplay";
+import {
+  POINTS_PER_CORRECT,
+  type RoleplayMember,
+  type RoleplayMessage,
+  type RoleplayState,
+} from "@/lib/caseRoleplay";
 
 type StateCallback = (state: RoleplayState) => void;
 
@@ -33,6 +38,7 @@ type Envelope =
   | { type: "STATE_UPDATE"; payload: RoleplayState }
   | { type: "JOIN"; payload: RoleplayMember }
   | { type: "CLAIM_ROLE"; payload: { memberId: string; roleId: string | null } }
+  | { type: "ANSWER"; payload: { memberId: string; optionIndex: number } }
   | { type: "CHAT"; payload: RoleplayMessage }
   | { type: "SYNC_REQUEST" };
 
@@ -66,6 +72,9 @@ export class CaseRoleplayEngine {
             roundIndex: 0,
             endsAt: null,
             pausedLeft: null,
+            answers: {},
+            revealed: false,
+            outcomes: [],
             messages: [],
           };
 
@@ -143,6 +152,11 @@ export class CaseRoleplayEngine {
       return;
     }
 
+    if (msg.type === "ANSWER") {
+      this.applyAnswer(msg.payload.memberId, msg.payload.optionIndex);
+      return;
+    }
+
     if (msg.type === "CHAT") {
       this.appendMessage(msg.payload);
       return;
@@ -177,6 +191,13 @@ export class CaseRoleplayEngine {
       members: this.state.members.map((m) => (m.id === memberId ? { ...m, roleId } : m)),
     });
     return true;
+  }
+
+  /** Жауап тек ашылмай тұрып қабылданады — ашылған соң өзгертуге болмайды. */
+  private applyAnswer(memberId: string, optionIndex: number) {
+    if (this.state.phase !== "playing" || this.state.revealed) return;
+    if (this.state.answers[memberId] === optionIndex) return;
+    this.commit({ answers: { ...this.state.answers, [memberId]: optionIndex } });
   }
 
   private appendMessage(message: RoleplayMessage) {
@@ -231,6 +252,39 @@ export class CaseRoleplayEngine {
     if (this.isHost) return this.applyClaim(memberId, roleId);
     this.send({ type: "CLAIM_ROLE", payload: { memberId, roleId } });
     return true;
+  }
+
+  /** Қатысушының жауабы. Хост бірден жазады, қонақ ниет жібереді. */
+  answer(memberId: string, optionIndex: number) {
+    if (this.isHost) {
+      this.applyAnswer(memberId, optionIndex);
+      return;
+    }
+    this.send({ type: "ANSWER", payload: { memberId, optionIndex } });
+  }
+
+  /**
+   * Раундты қорытындылау (хост). Әр рөлдің дұрыс жауабы `correctByRole`
+   * арқылы беріледі — сұрақтар кейс деректерінде тұр, қозғалтқыш оларды
+   * білмейді, сондықтан тек салыстырады да ұпайды қосады.
+   */
+  reveal(correctByRole: Record<string, number>) {
+    if (!this.isHost || this.state.revealed) return;
+
+    const correct: Record<string, boolean> = {};
+    const members = this.state.members.map((member) => {
+      const expected = member.roleId ? correctByRole[member.roleId] : undefined;
+      const given = this.state.answers[member.id];
+      const ok = expected !== undefined && given === expected;
+      correct[member.id] = ok;
+      return ok ? { ...member, score: member.score + POINTS_PER_CORRECT } : member;
+    });
+
+    this.commit({
+      revealed: true,
+      members,
+      outcomes: [...this.state.outcomes, { roundIndex: this.state.roundIndex, correct }],
+    });
   }
 
   postMessage(message: RoleplayMessage) {

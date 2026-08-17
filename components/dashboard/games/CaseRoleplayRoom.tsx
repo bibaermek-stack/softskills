@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuthStore } from "@/lib/authStore";
-import type { CaseRole, CaseRound } from "@/lib/caseTasks";
+import type { CaseQuestion, CaseRole, CaseRound } from "@/lib/caseTasks";
 import {
+  POINTS_PER_CORRECT,
   ROLEPLAY_AVATARS,
   formatClock,
   generateRoleplayCode,
@@ -104,6 +105,19 @@ export function CaseRoleplayRoom({
   const left = state ? secondsLeft(state, roundSeconds, now) : roundSeconds;
   const running = Boolean(state?.endsAt);
 
+  const myQuestion = round.questions.find((q) => q.roleId === me?.roleId);
+  const playersWithRole = state?.members.filter((m) => m.roleId).length ?? 0;
+  const answeredCount = state ? Object.keys(state.answers).length : 0;
+
+  /** Рөл → дұрыс нұсқа. Қозғалтқыш сұрақтарды білмейді, тек салыстырады. */
+  const correctByRole = useMemo(() => {
+    const map: Record<string, number> = {};
+    round.questions.forEach((q) => {
+      map[q.roleId] = q.correctIndex;
+    });
+    return map;
+  }, [round]);
+
   const startRoom = () => {
     const name = nameInput.trim() || "Жүргізуші";
     const code = generateRoleplayCode();
@@ -114,6 +128,7 @@ export function CaseRoleplayRoom({
       roleId: null,
       isHost: true,
       joinedAt: Date.now(),
+      score: 0,
     };
     const eng = new CaseRoleplayEngine(code, caseId, true, host);
     eng.patch({ messages: [systemMessage(`${name} бөлмені ашты. Рөлдеріңізді таңдаңдар.`)] });
@@ -135,6 +150,7 @@ export function CaseRoleplayRoom({
       roleId: null,
       isHost: false,
       joinedAt: Date.now(),
+      score: 0,
     };
     const eng = new CaseRoleplayEngine(code, caseId, false, member);
     eng.join(member);
@@ -179,14 +195,25 @@ export function CaseRoleplayRoom({
 
   // --- Хост басқаруы ------------------------------------------------------
   const startGame = () => {
-    if (!engine) return;
+    if (!engine || !state) return;
     engine.patch({
       phase: "playing",
       roundIndex: 0,
       pausedLeft: rounds[0].minutes * 60,
       endsAt: null,
-      messages: [...(state?.messages ?? []), systemMessage(`Ойын басталды. ${rounds[0].title}`)],
+      // Қайта ойнағанда ескі ұпай мен жауап қалып қоймауы керек.
+      answers: {},
+      revealed: false,
+      outcomes: [],
+      members: state.members.map((m) => ({ ...m, score: 0 })),
+      messages: [...state.messages, systemMessage(`Ойын басталды. ${rounds[0].title}`)],
     });
+  };
+
+  const reveal = () => {
+    if (!engine || !state || state.revealed) return;
+    engine.reveal(correctByRole);
+    engine.postMessage(systemMessage("Жауаптар ашылды."));
   };
 
   const toggleTimer = () => {
@@ -207,7 +234,7 @@ export function CaseRoleplayRoom({
         phase: "finished",
         endsAt: null,
         pausedLeft: null,
-        messages: [...state.messages, systemMessage("Раундтар аяқталды. Шешімдеріңді айтыңдар.")],
+        messages: [...state.messages, systemMessage("Раундтар аяқталды. Нәтиже дайын.")],
       });
       return;
     }
@@ -215,6 +242,8 @@ export function CaseRoleplayRoom({
       roundIndex: index,
       endsAt: null,
       pausedLeft: rounds[index].minutes * 60,
+      answers: {},
+      revealed: false,
       messages: [...state.messages, systemMessage(rounds[index].title)],
     });
   };
@@ -389,7 +418,7 @@ export function CaseRoleplayRoom({
           </p>
 
           {me?.isHost ? (
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-3 flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={toggleTimer}
@@ -399,21 +428,54 @@ export function CaseRoleplayRoom({
                 <Icon name={running ? "Pause" : "Play"} className="size-3.5" strokeWidth={2.4} />
                 {running ? "Тоқтату" : "Бастау"}
               </button>
-              <button
-                type="button"
-                onClick={nextRound}
-                className="flex items-center gap-1.5 rounded-lg border border-ink-700/12 px-3 py-1.5 text-[0.75rem] font-medium text-ink-700 transition hover:bg-ink-700/5 dark:border-white/12 dark:text-paper-200 dark:hover:bg-white/5"
-              >
-                {state.roundIndex < rounds.length - 1 ? "Келесі раунд" : "Ойынды аяқтау"}
-                <Icon name="ChevronRight" className="size-3.5" strokeWidth={2.2} />
-              </button>
+
+              {state.revealed ? (
+                <button
+                  type="button"
+                  onClick={nextRound}
+                  className="flex items-center gap-1.5 rounded-lg border border-ink-700/12 px-3 py-1.5 text-[0.75rem] font-medium text-ink-700 transition hover:bg-ink-700/5 dark:border-white/12 dark:text-paper-200 dark:hover:bg-white/5"
+                >
+                  {state.roundIndex < rounds.length - 1 ? "Келесі раунд" : "Нәтижені шығару"}
+                  <Icon name="ChevronRight" className="size-3.5" strokeWidth={2.2} />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={reveal}
+                  className="flex items-center gap-1.5 rounded-lg border border-ink-700/12 px-3 py-1.5 text-[0.75rem] font-medium text-ink-700 transition hover:bg-ink-700/5 dark:border-white/12 dark:text-paper-200 dark:hover:bg-white/5"
+                >
+                  <Icon name="Eye" className="size-3.5" strokeWidth={2.2} />
+                  Жауаптарды ашу
+                </button>
+              )}
+
+              <span className="text-[0.72rem] font-semibold tabular-nums text-ink-600/70 dark:text-paper-300">
+                {answeredCount}/{playersWithRole} жауап берді
+              </span>
             </div>
           ) : (
             <p className="mt-2 text-[0.72rem] text-ink-600/70 dark:text-paper-300">
-              Таймерді бөлме ашқан адам басқарады.
+              Таймер мен раундты бөлме ашқан адам басқарады.
             </p>
           )}
         </div>
+      ) : null}
+
+      {/* Әркімнің өз сұрағы */}
+      {state.phase === "playing" ? (
+        <QuestionCard
+          question={myQuestion}
+          hasRole={Boolean(me?.roleId)}
+          chosen={me ? state.answers[me.id] : undefined}
+          revealed={state.revealed}
+          accent={accent}
+          onAnswer={(index) => me && engine.answer(me.id, index)}
+        />
+      ) : null}
+
+      {/* Қорытынды нәтиже */}
+      {state.phase === "finished" ? (
+        <ResultBoard state={state} roles={roles} meId={meId} accent={accent} />
       ) : null}
 
       {state.phase === "finished" ? (
@@ -573,6 +635,209 @@ export function CaseRoleplayRoom({
           </button>
         </form>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Қатысушының өз сұрағы.
+ *
+ * Сұрақ рөлге байланған, сондықтан бір раундта әркім әртүрлі сұраққа жауап
+ * береді — көршісінен көшіру мүмкін емес, ал жауаптарды қосқанда команданың
+ * ортақ нәтижесі шығады.
+ */
+function QuestionCard({
+  question,
+  hasRole,
+  chosen,
+  revealed,
+  accent,
+  onAnswer,
+}: {
+  question: CaseQuestion | undefined;
+  hasRole: boolean;
+  chosen: number | undefined;
+  revealed: boolean;
+  accent: string;
+  onAnswer: (index: number) => void;
+}) {
+  if (!hasRole) {
+    return (
+      <p className="rounded-xl border border-dashed border-ink-700/15 px-3 py-2.5 text-[0.78rem] text-ink-700/85 dark:border-white/15 dark:text-paper-300">
+        Сұрақ алу үшін алдымен рөл таңдаңыз.
+      </p>
+    );
+  }
+
+  if (!question) {
+    return (
+      <p className="rounded-xl border border-dashed border-ink-700/15 px-3 py-2.5 text-[0.78rem] text-ink-700/85 dark:border-white/15 dark:text-paper-300">
+        Бұл раундта сіздің рөліңізге сұрақ жоқ — топты тыңдап, талқылауға қосылыңыз.
+      </p>
+    );
+  }
+
+  const correct = question.correctIndex;
+
+  return (
+    <div className="rounded-xl border border-ink-700/8 p-3 dark:border-white/10">
+      <h5 className="text-[0.72rem] font-bold tracking-wide text-ink-700/70 uppercase dark:text-paper-300">
+        Сіздің сұрағыңыз
+      </h5>
+      <p className="mt-1 font-display text-[0.86rem] leading-snug font-semibold text-ink-900 dark:text-white">
+        {question.prompt}
+      </p>
+
+      <div className="mt-2.5 flex flex-col gap-1.5">
+        {question.options.map((option, index) => {
+          const picked = chosen === index;
+          const isCorrect = revealed && index === correct;
+          const isWrongPick = revealed && picked && index !== correct;
+
+          let borderColor = "color-mix(in srgb, var(--color-ink-700) 10%, transparent)";
+          let background: string | undefined;
+          if (isCorrect) {
+            borderColor = "rgb(16 185 129 / 0.55)";
+            background = "rgb(16 185 129 / 0.1)";
+          } else if (isWrongPick) {
+            borderColor = "rgb(220 38 38 / 0.5)";
+            background = "rgb(220 38 38 / 0.08)";
+          } else if (picked) {
+            borderColor = `color-mix(in srgb, ${accent} 55%, transparent)`;
+            background = `color-mix(in srgb, ${accent} 8%, transparent)`;
+          }
+
+          return (
+            <button
+              key={option}
+              type="button"
+              disabled={revealed}
+              onClick={() => onAnswer(index)}
+              aria-pressed={picked}
+              className="flex items-start gap-2 rounded-lg border px-3 py-2 text-left text-[0.8rem] leading-snug text-ink-800 transition-colors disabled:cursor-default dark:text-paper-100"
+              style={{ borderColor, backgroundColor: background }}
+            >
+              {revealed && (isCorrect || isWrongPick) ? (
+                <Icon
+                  name={isCorrect ? "CircleCheck" : "X"}
+                  className={`mt-px size-3.5 shrink-0 ${isCorrect ? "text-emerald-500" : "text-red-500"}`}
+                  strokeWidth={2.4}
+                />
+              ) : (
+                <span className="mt-px size-3.5 shrink-0" />
+              )}
+              {option}
+            </button>
+          );
+        })}
+      </div>
+
+      {revealed ? (
+        <p className="mt-2.5 rounded-lg bg-ink-700/5 px-3 py-2 text-[0.78rem] leading-snug text-ink-700 dark:bg-white/10 dark:text-paper-200">
+          {question.explain}
+        </p>
+      ) : chosen === undefined ? (
+        <p className="mt-2 text-[0.72rem] text-ink-600/70 dark:text-paper-300">
+          Бір нұсқаны таңдаңыз.
+        </p>
+      ) : (
+        <p className="mt-2 text-[0.72rem] font-semibold" style={{ color: accent }}>
+          Жауабыңыз қабылданды. Ашылғанша өзгертуге болады.
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Ойын соңындағы нәтиже: кім қанша ұпай жинады және команда қанша. */
+function ResultBoard({
+  state,
+  roles,
+  meId,
+  accent,
+}: {
+  state: RoleplayState;
+  roles: CaseRole[];
+  meId: string;
+  accent: string;
+}) {
+  const ranked = [...state.members].sort((a, b) => b.score - a.score || a.joinedAt - b.joinedAt);
+  const teamScore = state.members.reduce((sum, m) => sum + m.score, 0);
+  const maxTeamScore = state.outcomes.length * state.members.length * POINTS_PER_CORRECT;
+  const teamCorrect = state.outcomes.reduce(
+    (sum, outcome) => sum + Object.values(outcome.correct).filter(Boolean).length,
+    0,
+  );
+
+  return (
+    <div className="rounded-xl border border-ink-700/8 p-3 dark:border-white/10">
+      <h5 className="text-[0.72rem] font-bold tracking-wide text-ink-700/70 uppercase dark:text-paper-300">
+        Ойын нәтижесі
+      </h5>
+
+      <div
+        className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-lg px-3 py-2.5"
+        style={{ backgroundColor: `color-mix(in srgb, ${accent} 10%, transparent)` }}
+      >
+        <span className="font-display text-[1.35rem] font-black tabular-nums" style={{ color: accent }}>
+          {teamScore}
+        </span>
+        <span className="text-[0.78rem] font-semibold text-ink-800 dark:text-paper-100">
+          команда ұпайы
+        </span>
+        <span className="text-[0.74rem] text-ink-700/75 dark:text-paper-300">
+          · {teamCorrect} дұрыс жауап
+          {maxTeamScore > 0 ? ` · ${teamScore}/${maxTeamScore}` : ""}
+        </span>
+      </div>
+
+      <ol className="mt-2.5 space-y-1.5">
+        {ranked.map((member, i) => {
+          const role = roles.find((r) => r.id === member.roleId);
+          const correctCount = state.outcomes.filter((o) => o.correct[member.id]).length;
+          const mine = member.id === meId;
+          return (
+            <li
+              key={member.id}
+              className="flex items-center gap-2.5 rounded-lg border px-3 py-2"
+              style={{
+                borderColor: mine
+                  ? `color-mix(in srgb, ${accent} 45%, transparent)`
+                  : "color-mix(in srgb, var(--color-ink-700) 8%, transparent)",
+                backgroundColor: mine ? `color-mix(in srgb, ${accent} 6%, transparent)` : undefined,
+              }}
+            >
+              <span className="w-4 shrink-0 font-display text-[0.8rem] font-bold tabular-nums text-ink-600/70 dark:text-paper-300">
+                {i + 1}
+              </span>
+              <span aria-hidden className="text-base">
+                {member.avatar}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-display text-[0.82rem] font-semibold text-ink-900 dark:text-white">
+                  {member.name}
+                  {mine ? " (сіз)" : ""}
+                </span>
+                <span className="block truncate text-[0.72rem] text-ink-700/75 dark:text-paper-300">
+                  {role ? `${role.emoji} ${role.name}` : "рөлсіз"} · {correctCount}/
+                  {state.outcomes.length} дұрыс
+                </span>
+              </span>
+              <span
+                className="shrink-0 font-display text-[0.95rem] font-black tabular-nums"
+                style={{ color: accent }}
+              >
+                {member.score}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+
+      <p className="mt-2.5 text-[0.74rem] leading-snug text-ink-700/85 dark:text-paper-300">
+        Ұпай — бір-бірін тыңдаған команданың нәтижесі. Енді талқылау қадамына өтіп,
+        сұрақтарды бірге талдаңдар.
+      </p>
     </div>
   );
 }

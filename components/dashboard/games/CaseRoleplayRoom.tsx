@@ -47,14 +47,17 @@ export function CaseRoleplayRoom({
   roles,
   rounds,
   accent,
+  initialCode,
 }: {
   caseId: string;
   roles: CaseRole[];
   rounds: CaseRound[];
   accent: string;
+  /** QR-код арқылы келгенде — бірден қосылу формасы, коды толтырылған күйде. */
+  initialCode?: string;
 }) {
   const authUser = useAuthStore((s) => s.user);
-  const [mode, setMode] = useState<Mode>("closed");
+  const [mode, setMode] = useState<Mode>(initialCode ? "join" : "closed");
   const [engine, setEngine] = useState<CaseRoleplayEngine | null>(null);
   const [state, setState] = useState<RoleplayState | null>(null);
   const [meId, setMeId] = useState("");
@@ -62,7 +65,7 @@ export function CaseRoleplayRoom({
   const [notice, setNotice] = useState("");
 
   // Қосылу формасы
-  const [codeInput, setCodeInput] = useState("");
+  const [codeInput, setCodeInput] = useState(initialCode ?? "");
   const [nameInput, setNameInput] = useState("");
   const [avatar, setAvatar] = useState(ROLEPLAY_AVATARS[0]);
 
@@ -304,6 +307,12 @@ export function CaseRoleplayRoom({
   const everyoneReady =
     state.members.length >= 2 && state.members.every((m) => m.roleId !== null);
 
+  const origin =
+    typeof window !== "undefined" && window.location.origin !== "null"
+      ? window.location.origin
+      : "";
+  const joinUrl = `${origin}/play/case?code=${state.roomCode}&case=${encodeURIComponent(caseId)}`;
+
   return (
     <div className="flex flex-col gap-3">
       {/* Бөлме тақырыбы */}
@@ -339,7 +348,13 @@ export function CaseRoleplayRoom({
 
       {state.phase === "lobby" && me?.isHost ? (
         <div className="flex justify-center rounded-xl border border-ink-700/8 py-4 dark:border-white/10">
-          <QrCodeDisplay roomCode={state.roomCode} size={150} />
+          {/* Сілтеме кейстің рөлдік бөлмесіне апаруы керек — жалпы `/play`
+              командалық викторинаны ашады, ондағы рөлдер мүлдем басқа. */}
+          <QrCodeDisplay
+            roomCode={state.roomCode}
+            joinUrl={joinUrl}
+            size={150}
+          />
         </div>
       ) : null}
 

@@ -176,6 +176,101 @@ function generateAFrameHTML(scenario: VRScenarioId): string {
       return new THREE.CanvasTexture(canvas);
     }
 
+    /**
+     * Сахнаның шағылысу ортасы.
+     *
+     * Зертханадағы дүниенің бәрі металл: үстел, робот тұғыры, қармауыш,
+     * конвейер — бәрінің metalness мәні 0.7-ден жоғары. Ал металл өз түсімен
+     * емес, айналасын шағылыстырып көрінеді. Шағылысатын орта болмаса,
+     * MeshStandardMaterial оларды тас қара етіп салады — зертхана «сөнген»
+     * сияқты көрінетіні содан.
+     *
+     * Сондықтан жоғарысы жарық, төменгі жағы қараңғы қарапайым градиентті
+     * панорама жасап, оны бүкіл сахнаның ортасы етеміз. Ол сурет файлын да,
+     * қосымша кітапхананы да қажет етпейді.
+     */
+    function createEnvironmentTexture() {
+      var canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 128;
+      var ctx = canvas.getContext('2d');
+
+      var sky = ctx.createLinearGradient(0, 0, 0, 128);
+      sky.addColorStop(0.0, '#e0f2fe');
+      sky.addColorStop(0.45, '#7dd3fc');
+      sky.addColorStop(0.55, '#334155');
+      sky.addColorStop(1.0, '#0b1120');
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, 256, 128);
+
+      // Төбедегі шам жолақтары — металда ұзын жарық сызық болып шағылады,
+      // сол өндірістік көрініс береді.
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+      ctx.fillRect(0, 18, 256, 6);
+      ctx.fillRect(0, 34, 256, 3);
+
+      var texture = new THREE.CanvasTexture(canvas);
+      texture.mapping = THREE.EquirectangularReflectionMapping;
+      return texture;
+    }
+
+    AFRAME.registerComponent('studio-environment', {
+      init: function () {
+        this.el.object3D.environment = createEnvironmentTexture();
+      }
+    });
+
+    /* ------------------------------------------------------------------ *\\
+       Нысанды тану және тапсырма есебі
+
+       Бұрын әр сахнаның бір ғана «click» тыңдаушысы болатын да, ол бір басу
+       үшін үш тапсырманы бірден орындалды деп белгілейтін. Енді әр нысан
+       өзінің атын, сипаттамасын және қай тапсырмаға жататынын өзі алып жүреді,
+       ал басу сол нысанды тауып, дәл соның тапсырмасын ғана жабады.
+    \\* ------------------------------------------------------------------ */
+
+    /** Нысанға ат, сипаттама және тапсырма идентификаторын бекіту. */
+    function tagObject(object, label, info, taskId, onSelect) {
+      object.userData = { label: label, info: info, taskId: taskId, onSelect: onSelect };
+      return object;
+    }
+
+    /** Басылған үшбұрыштан жоғары қарай атауы бар ең жақын ата-нысанды табу. */
+    function findTagged(object) {
+      var node = object;
+      while (node) {
+        if (node.userData && node.userData.label) return node;
+        node = node.parent;
+      }
+      return null;
+    }
+
+    /**
+     * Сахнаға бір ортақ басу тыңдаушысын орнату. Нысан танылмаса — ештеңе
+     * болмайды: бос басу тапсырманы жаппауы керек.
+     */
+    function bindPicking(el) {
+      el.addEventListener('click', function (e) {
+        var hit = e.detail && e.detail.intersection && e.detail.intersection.object;
+        var target = hit ? findTagged(hit) : null;
+        if (!target) return;
+
+        var data = target.userData;
+        if (typeof data.onSelect === 'function') data.onSelect(target);
+
+        var hud = document.getElementById('hud-text');
+        if (hud) hud.innerText = data.label + ' — ' + data.info;
+
+        window.parent.postMessage(
+          { type: 'VR_INTERACTION', info: data.label + ' — ' + data.info },
+          '*'
+        );
+        if (data.taskId) {
+          window.parent.postMessage({ type: 'TASK_PROGRESS', taskId: data.taskId }, '*');
+        }
+      });
+    }
+
     // 1. High-Fidelity Physics & Laser Lab Component
     AFRAME.registerComponent('highfi-physics-lab', {
       init: function () {
@@ -244,7 +339,12 @@ function generateAFrameHTML(scenario: VRScenarioId): string {
         laserLight.position.set(0.4, 0.12, 0);
         laserGroup.add(laserLight);
 
-        laserGroup.userData = { info: 'Қуатты 650нм Қызыл Лазер Модулі (Nd:YAG)' };
+        tagObject(
+          laserGroup,
+          'Лазер модулі',
+          '650 нм қызыл лазер, 3B класы. Сәуле призмаға бағытталған.',
+          't1'
+        );
         group.add(laserGroup);
 
         // 3. Volumetric Red Laser Beam (Emitter to Prism)
@@ -295,7 +395,18 @@ function generateAFrameHTML(scenario: VRScenarioId): string {
         prismMesh.position.set(0, 0.04, -0.22);
         prismGroup.add(prismMesh);
 
-        prismGroup.userData = { info: 'Оптикалық Кварц Призмасы (n = 1.517) • Басып бұрыңыз' };
+        var prismAngle = 0;
+        tagObject(
+          prismGroup,
+          'Кварц призмасы',
+          'Сыну көрсеткіші n = 1.517. Әр басқанда 45°-қа бұрылады.',
+          't2',
+          function () {
+            prismAngle += Math.PI / 4;
+            prismGroup.rotation.y = prismAngle;
+            rainbowGroup.rotation.y = prismAngle * 0.8;
+          }
+        );
         group.add(prismGroup);
 
         // 5. Seven Rainbow Spectral Beams Dispersing from Prism
@@ -341,7 +452,12 @@ function generateAFrameHTML(scenario: VRScenarioId): string {
         screen.position.set(-0.105, 0.12, 0);
         sensorGroup.add(screen);
 
-        sensorGroup.userData = { info: 'Сандық Фотосенсор (Спектр қабылдағыш) • Тіркеу: 98.4%' };
+        tagObject(
+          sensorGroup,
+          'Фотосенсор',
+          'Спектр сәулесін қабылдап, толқын ұзындығын өлшейді.',
+          't3'
+        );
         group.add(sensorGroup);
 
         // 7. Newton's Cradle (Full Steel Physics Apparatus)
@@ -371,16 +487,20 @@ function generateAFrameHTML(scenario: VRScenarioId): string {
           cradleGroup.add(ball);
           balls.push(ball);
         }
-        cradleGroup.userData = { info: 'Ньютон Тербелмесі (Импульс пен Энергияның сақталу заңы)' };
+        tagObject(
+          cradleGroup,
+          'Ньютон тербелмесі',
+          'Импульс пен энергияның сақталу заңын көрсетеді. Тапсырмаға кірмейді.'
+        );
         group.add(cradleGroup);
 
         // 8. 3D Floating Cybernetic HUD
         var hudTexture = createHudPanelTexture('ОПТИКА & ЛАЗЕР ЗЕРТХАНАСЫ', [
-          '• Толкын узындыгы: lambda = 650 нм',
-          '• Сыну корсеткиши: n = 1.517 (Кварц)',
-          '• Сыну заны: sin(alpha) / sin(beta) = n',
-          '• 7-тусти спектр: Ньютон дисперсиясы',
-          '• Статус: Сенсор косылды (100% сигнал)'
+          '• Толқын ұзындығы: λ = 650 нм',
+          '• Сыну көрсеткіші: n = 1.517 (кварц)',
+          '• Сыну заңы: sin α / sin β = n',
+          '• 7 түсті спектр: Ньютон дисперсиясы',
+          '• Күйі: сенсор қосылды (100% сигнал)'
         ]);
         var hudGeo = new THREE.PlaneGeometry(1.8, 1.35);
         var hudMat = new THREE.MeshBasicMaterial({ map: hudTexture, transparent: true, opacity: 0.92, side: THREE.DoubleSide });
@@ -398,8 +518,7 @@ function generateAFrameHTML(scenario: VRScenarioId): string {
 
         el.setObject3D('mesh', group);
 
-        // Interaction & Animation Loop
-        var angle = 0;
+        // Animation Loop
         var time = 0;
 
         function animate() {
@@ -419,17 +538,7 @@ function generateAFrameHTML(scenario: VRScenarioId): string {
         }
         animate();
 
-        // Prism click interaction
-        prismGroup.cursor = 'pointer';
-        el.addEventListener('click', function (e) {
-          angle += Math.PI / 4;
-          prismGroup.rotation.y = angle;
-          rainbowGroup.rotation.y = angle * 0.8;
-          document.getElementById('hud-text').innerText = '✅ Призма бұрышы өзгерді (' + Math.round(angle * 180 / Math.PI) + '°). 7 түсті спектр шағылды!';
-          window.parent.postMessage({ type: 'TASK_PROGRESS', taskId: 't1' }, '*');
-          window.parent.postMessage({ type: 'TASK_PROGRESS', taskId: 't2' }, '*');
-          window.parent.postMessage({ type: 'TASK_PROGRESS', taskId: 't3' }, '*');
-        });
+        bindPicking(el);
       }
     });
 
@@ -464,14 +573,27 @@ function generateAFrameHTML(scenario: VRScenarioId): string {
         sunLight.position.set(0, 1.6, -5);
         group.add(sunLight);
 
+        tagObject(
+          sunMesh,
+          'Күн',
+          'G2V класты жұлдыз, беті 5778 K. Жүйенің бүкіл тартылысы осында.',
+          's3'
+        );
+
         // Planets configurations
         var planets = [
-          { name: 'Меркурий', r: 0.12, dist: 2.2, color: 0x94a3b8, speed: 0.04 },
-          { name: 'Шолпан', r: 0.22, dist: 3.2, color: 0xf97316, speed: 0.025 },
-          { name: 'Жер', r: 0.26, dist: 4.5, color: 0x0284c7, speed: 0.018, hasMoon: true },
-          { name: 'Марс', r: 0.18, dist: 5.8, color: 0xef4444, speed: 0.014 },
-          { name: 'Юпитер', r: 0.55, dist: 7.6, color: 0xd97706, speed: 0.009 },
-          { name: 'Сатурн', r: 0.45, dist: 9.4, color: 0xeab308, speed: 0.006, hasRings: true }
+          { name: 'Меркурий', info: 'Күнге ең жақын ғаламшар. Атмосферасы жоқ.',
+            r: 0.12, dist: 2.2, color: 0x94a3b8, speed: 0.04 },
+          { name: 'Шолпан', info: 'Көмірқышқыл газды қалың атмосфера, беті +460 °C.',
+            r: 0.22, dist: 3.2, color: 0xf97316, speed: 0.025 },
+          { name: 'Жер', info: 'Жалғыз серігі — Ай. Орбитаны бір жылда айналады.',
+            taskId: 's1', r: 0.26, dist: 4.5, color: 0x0284c7, speed: 0.018, hasMoon: true },
+          { name: 'Марс', info: 'Темір тотығынан қызыл түсті. Екі кіші серігі бар.',
+            r: 0.18, dist: 5.8, color: 0xef4444, speed: 0.014 },
+          { name: 'Юпитер', info: 'Жүйедегі ең үлкен газ алыбы. Үлкен Қызыл Дақ — дауыл.',
+            taskId: 's2', r: 0.55, dist: 7.6, color: 0xd97706, speed: 0.009 },
+          { name: 'Сатурн', info: 'Сақиналары мұз бен шаң бөлшектерінен тұрады.',
+            taskId: 's2', r: 0.45, dist: 9.4, color: 0xeab308, speed: 0.006, hasRings: true }
         ];
 
         var planetMeshes = [];
@@ -500,16 +622,20 @@ function generateAFrameHTML(scenario: VRScenarioId): string {
             pMesh.add(ring);
           }
 
+          // Әр ғаламшар өз атымен танылады: бұрын аты деректе жатып,
+          // экранда ешқашан көрінбейтін.
+          tagObject(pMesh, p.name, p.info, p.taskId);
+
           planetMeshes.push({ mesh: pMesh, config: p, angle: Math.random() * Math.PI * 2 });
         });
 
         // 3D HUD
         var hudTexture = createHudPanelTexture('КҮН ЖҮЙЕСІ & ОРБИТАЛАР', [
-          '• Орталык жулдыз: Күн (G2V, 5778 K)',
-          '• Жер аракашыктыгы: 1 А.Б. (149.6 млн км)',
-          '• Тартылыс заны: F = G*(M*m)/r^2',
-          '• Сатурн сакиналары: Муз бен шаң булттары',
-          '• Баскару: 360° бакылау & Meta Quest'
+          '• Орталық жұлдыз: Күн (G2V, 5778 K)',
+          '• Жерге дейінгі қашықтық: 1 а.б. (149,6 млн км)',
+          '• Тартылыс заңы: F = G·M·m / r²',
+          '• Сатурн сақиналары: мұз бен шаң бөлшектері',
+          '• Басқару: 360° бақылау, Meta Quest'
         ]);
         var hudMesh = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.35), new THREE.MeshBasicMaterial({ map: hudTexture, transparent: true, opacity: 0.9 }));
         hudMesh.position.set(-2, 2.4, -3);
@@ -517,6 +643,8 @@ function generateAFrameHTML(scenario: VRScenarioId): string {
         group.add(hudMesh);
 
         el.setObject3D('mesh', group);
+
+        bindPicking(el);
 
         function animateSpace() {
           requestAnimationFrame(animateSpace);
@@ -577,6 +705,12 @@ function generateAFrameHTML(scenario: VRScenarioId): string {
         cres.position.set(0, 6.9, -1.2);
         portalGroup.add(cres);
 
+        tagObject(
+          portalGroup,
+          'Көгілдір күмбез',
+          'Ясауи кесенесінің стиліндегі қыш күмбез. Ою-өрнегі геометриялық.',
+          'h1'
+        );
         group.add(portalGroup);
 
         // Pedestals with Artifacts
@@ -592,6 +726,12 @@ function generateAFrameHTML(scenario: VRScenarioId): string {
         var pot = new THREE.Mesh(potGeo, potMat);
         pot.position.y = 1.15;
         art1Group.add(pot);
+        tagObject(
+          art1Group,
+          'Отырар құмырасы',
+          'XII ғасыр қыш ыдысы. Астық пен суды сақтауға арналған.',
+          'h2'
+        );
         group.add(art1Group);
 
         // Artifact 2: Ancient Golden Dirhams & Coins Display
@@ -607,6 +747,12 @@ function generateAFrameHTML(scenario: VRScenarioId): string {
         coin.rotation.x = Math.PI / 4;
         coin.position.y = 1.05;
         art2Group.add(coin);
+        tagObject(
+          art2Group,
+          'Сауда дирхамы',
+          'Жібек жолындағы күміс теңге. Сауда байланысының дәлелі.',
+          'h3'
+        );
         group.add(art2Group);
 
         // Warm Ancient Torch Light
@@ -617,9 +763,9 @@ function generateAFrameHTML(scenario: VRScenarioId): string {
         // 3D HUD
         var hudTexture = createHudPanelTexture('ҰЛЫ ЖІБЕК ЖОЛЫ МҰРАСЫ', [
           '• Отырар • Түркістан • Сауран',
-          '• Когилдир кыш кумбез (Ясауи стили)',
-          '• XII гасыр кыш ыдыстары',
-          '• Жедигерлер мен алтын дирхамдар',
+          '• Көгілдір қыш күмбез (Ясауи стилі)',
+          '• XII ғасыр қыш ыдыстары',
+          '• Жәдігерлер мен алтын дирхамдар',
           '• Тарихи эмпатия & 3D архитектура'
         ]);
         var hudMesh = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.35), new THREE.MeshBasicMaterial({ map: hudTexture, transparent: true, opacity: 0.9 }));
@@ -628,8 +774,28 @@ function generateAFrameHTML(scenario: VRScenarioId): string {
         group.add(hudMesh);
 
         el.setObject3D('mesh', group);
+
+        bindPicking(el);
       }
     });
+
+    // Робот циклінің тұрақтылары мен көмекшілері — компоненттен тыс тұр,
+    // себебі оларды tick те, поза есептеу де қолданады.
+    var POSE_HOME = { shoulder: -0.35, elbow: -0.60 };
+    var POSE_PICK = { shoulder: -1.156, elbow: -0.907 };
+    var YAW_CONVEYOR = Math.PI;
+    var YAW_TRAY = 0;
+    var CYCLE = 5.0;
+
+    function lerp(a, b, t) { return a + (b - a) * t; }
+
+    /** Кезеңнің 0..1 үлесі, басы мен соңы жұмсақ. */
+    function phase(t, from, to) {
+      if (t <= from) return 0;
+      if (t >= to) return 1;
+      var k = (t - from) / (to - from);
+      return k * k * (3 - 2 * k);
+    }
 
     // 4. High-Fidelity Robotics & Digital Twin Component
     AFRAME.registerComponent('highfi-robotics-lab', {
@@ -645,97 +811,260 @@ function generateAFrameHTML(scenario: VRScenarioId): string {
         group.add(floor);
 
         // 6-Axis Industrial Robotic Arm
+        //
+        // Буындар бір-бірінің ішінде тұр: турель → иық → шынтақ → білезік.
+        // Сондықтан бір бұрышты өзгерткенде одан кейінгі бөліктер бірге
+        // қозғалады. Бұрын бәрі бір деңгейде жатқандықтан қол бүгіле алмай,
+        // тік бағана болып тұратын да, қорапты ала алмайтын.
         var robotGroup = new THREE.Group();
         robotGroup.position.set(0, 0, -2);
 
-        // Heavy Base
-        var rBase = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.65, 0.4, 32), new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9, roughness: 0.2 }));
+        var jointMat = new THREE.MeshStandardMaterial({ color: 0x047857, metalness: 0.75, roughness: 0.3 });
+        var linkMat = new THREE.MeshStandardMaterial({ color: 0x10b981, metalness: 0.6, roughness: 0.35 });
+
+        var rBase = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.65, 0.4, 32), new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.7, roughness: 0.35 }));
         rBase.position.y = 0.2;
         robotGroup.add(rBase);
 
-        // Base Turret (Rotating Joint 1)
+        // 1-буын: тік ось бойынша бұрылу
         var turretGroup = new THREE.Group();
         turretGroup.position.y = 0.4;
-        var turretMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.3, 32), new THREE.MeshStandardMaterial({ color: 0x10b981, metalness: 0.8, roughness: 0.2 }));
+        var turretMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.3, 32), new THREE.MeshStandardMaterial({ color: 0x10b981, metalness: 0.6, roughness: 0.35 }));
         turretGroup.add(turretMesh);
 
-        // Link 1 & Shoulder Joint
-        var shoulder = new THREE.Mesh(new THREE.SphereGeometry(0.22, 24, 24), new THREE.MeshStandardMaterial({ color: 0x047857, metalness: 0.9 }));
-        shoulder.position.y = 0.35;
-        turretGroup.add(shoulder);
+        // 2-буын: иық
+        var shoulderJoint = new THREE.Group();
+        shoulderJoint.position.y = 0.35;
+        turretGroup.add(shoulderJoint);
+        shoulderJoint.add(new THREE.Mesh(new THREE.SphereGeometry(0.22, 24, 24), jointMat));
 
-        var arm1 = new THREE.Mesh(new THREE.BoxGeometry(0.22, 1.1, 0.22), new THREE.MeshStandardMaterial({ color: 0x10b981, metalness: 0.7 }));
-        arm1.position.set(0, 0.9, 0);
-        turretGroup.add(arm1);
+        var arm1 = new THREE.Mesh(new THREE.BoxGeometry(0.22, 1.1, 0.22), linkMat);
+        arm1.position.y = 0.55;
+        shoulderJoint.add(arm1);
 
-        // Elbow Joint & Forearm
-        var elbow = new THREE.Mesh(new THREE.SphereGeometry(0.18, 24, 24), new THREE.MeshStandardMaterial({ color: 0x047857, metalness: 0.9 }));
-        elbow.position.set(0, 1.45, 0);
-        turretGroup.add(elbow);
+        // 3-буын: шынтақ
+        var elbowJoint = new THREE.Group();
+        elbowJoint.position.y = 1.1;
+        shoulderJoint.add(elbowJoint);
+        elbowJoint.add(new THREE.Mesh(new THREE.SphereGeometry(0.18, 24, 24), jointMat));
 
-        var arm2 = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 0.9, 24), new THREE.MeshStandardMaterial({ color: 0x059669, metalness: 0.8 }));
-        arm2.rotation.z = -Math.PI / 4;
-        arm2.position.set(0.35, 1.75, 0);
-        turretGroup.add(arm2);
+        var arm2 = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 0.9, 24), new THREE.MeshStandardMaterial({ color: 0x059669, metalness: 0.6, roughness: 0.35 }));
+        arm2.position.y = 0.45;
+        elbowJoint.add(arm2);
 
-        // Dual-Finger Gripper
-        var gripper = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.1, 0.25), new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9 }));
-        gripper.position.set(0.65, 2.05, 0);
-        var f1 = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.15, 0.05), new THREE.MeshStandardMaterial({ color: 0xef4444 }));
-        f1.position.set(-0.08, 0.1, 0);
+        // Білезік пен екі саусақты қармауыш
+        var wrist = new THREE.Group();
+        wrist.position.y = 0.9;
+        elbowJoint.add(wrist);
+
+        var gripper = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.12, 0.26), new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.7, roughness: 0.3 }));
+        wrist.add(gripper);
+
+        var fingerMat = new THREE.MeshStandardMaterial({ color: 0xef4444, metalness: 0.4, roughness: 0.5 });
+        var f1 = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.22, 0.16), fingerMat);
+        f1.position.set(-0.14, -0.14, 0);
         gripper.add(f1);
-        var f2 = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.15, 0.05), new THREE.MeshStandardMaterial({ color: 0xef4444 }));
-        f2.position.set(0.08, 0.1, 0);
+        var f2 = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.22, 0.16), fingerMat);
+        f2.position.set(0.14, -0.14, 0);
         gripper.add(f2);
-        turretGroup.add(gripper);
+
+        tagObject(
+          gripper,
+          'Қармауыш',
+          'Екі саусақты ұстағыш. Қорапты конвейерден алып, науаға қояды.',
+          'r2'
+        );
 
         robotGroup.add(turretGroup);
         group.add(robotGroup);
 
-        // Conveyor Belt with Workpiece
+        // Конвейер және қорап
         var convGroup = new THREE.Group();
         convGroup.position.set(-1.8, 0.4, -2);
-        var cBed = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.25, 0.6), new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.8 }));
+        var cBed = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.25, 0.6), new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.6, roughness: 0.4 }));
         convGroup.add(cBed);
 
-        var part = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.18, 0.25), new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.7 }));
-        part.position.set(0, 0.22, 0);
+        // Қораптардың пішіні мен материалы ортақ: цикл сайын жаңа қорап
+        // жасалады, ал әрқайсысына бөлек геометрия жасау жадты босқа алар еді.
+        var partGeometry = new THREE.BoxGeometry(0.26, 0.18, 0.26);
+        var partMaterial = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.4, roughness: 0.45 });
+        var part = new THREE.Mesh(partGeometry, partMaterial);
+        part.position.set(-1.15, 0.22, 0);
         convGroup.add(part);
+
+        tagObject(
+          convGroup,
+          'Конвейер',
+          'Қорап осы жерден алынады. Толық цикл — 5 секунд.',
+          'r3'
+        );
         group.add(convGroup);
 
-        // 3D HUD
+        // Шығыс науасы — қорап осында қойылады
+        var trayGroup = new THREE.Group();
+        trayGroup.position.set(1.8, 0.4, -2);
+        var trayBed = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.16, 0.9), new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.6, roughness: 0.4 }));
+        trayGroup.add(trayBed);
+        var trayLip = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.12, 0.06), new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.6, roughness: 0.4 }));
+        trayLip.position.set(0, 0.14, 0.42);
+        trayGroup.add(trayLip);
+        tagObject(trayGroup, 'Шығыс науасы', 'Дайын қорап осында жиналады.');
+        group.add(trayGroup);
+
         var hudTexture = createHudPanelTexture('ИНЖЕНЕРЛІК ЦИФРЛЫҚ ЕГІЗ', [
-          '• 6-осьтик робот манипуляторы',
-          '• Серво куаты: 1.5 кВт (High-Torque)',
-          '• Кинематика: Forward / Inverse Kinematics',
-          '• Конвейер синхронизациясы: 2.4 с/цикл',
-          '• Meta Quest контроллер колдауы'
+          '• 6 осьті робот манипуляторы',
+          '• Серво қуаты: 1,5 кВт',
+          '• Кинематика: тура және кері есеп',
+          '• Толық цикл: 5 секунд',
+          '• Meta Quest контроллерін қолдау'
         ]);
         var hudMesh = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.35), new THREE.MeshBasicMaterial({ map: hudTexture, transparent: true, opacity: 0.9 }));
-        hudMesh.position.set(1.8, 2.0, -1.2);
+        hudMesh.position.set(1.9, 2.5, -0.9);
         hudMesh.rotation.y = -0.4;
         group.add(hudMesh);
 
         el.setObject3D('mesh', group);
 
-        // Animation & Click
-        var rAngle = 0;
-        var rTime = 0;
-        function animateRobot() {
-          requestAnimationFrame(animateRobot);
-          rTime += 0.02;
-          part.position.x = Math.sin(rTime) * 0.9;
-        }
-        animateRobot();
+        // Жинақтау циклінің күйі. Анимация tick әдісінде жүреді:
+        // A-Frame-нің өз циклы сахна тоқтағанда бірге тоқтайды, ал жеке
+        // requestAnimationFrame одан бөлек жүріп, көрінбейтін қойындыда
+        // мүлдем іске қосылмайтын.
+        this.rig = {
+          turret: turretGroup,
+          shoulder: shoulderJoint,
+          elbow: elbowJoint,
+          gripper: gripper,
+          f1: f1,
+          f2: f2,
+          part: part,
+          partGeometry: partGeometry,
+          partMaterial: partMaterial,
+          delivered: [],
+          belt: convGroup,
+          tray: trayGroup,
+          clock: 0,
+          carried: false,
+          running: true
+        };
 
-        el.addEventListener('click', function() {
-          rAngle += Math.PI / 3;
-          turretGroup.rotation.y = rAngle;
-          document.getElementById('hud-text').innerText = '🤖 Робот буыны ' + Math.round(rAngle * 180 / Math.PI) + '° бұрышына бағытталды.';
-          window.parent.postMessage({ type: 'TASK_PROGRESS', taskId: 'r1' }, '*');
-          window.parent.postMessage({ type: 'TASK_PROGRESS', taskId: 'r2' }, '*');
-          window.parent.postMessage({ type: 'TASK_PROGRESS', taskId: 'r3' }, '*');
+        this.applyPose(POSE_HOME);
+        turretGroup.rotation.y = YAW_CONVEYOR;
+
+        tagObject(
+          turretGroup,
+          'Манипулятор буыны',
+          'Жинақтау циклін тоқтату немесе жалғастыру үшін басыңыз.',
+          'r1',
+          (function (self) {
+            return function () {
+              self.rig.running = !self.rig.running;
+            };
+          })(this)
+        );
+
+        bindPicking(el);
+      },
+
+      applyPose: function (pose) {
+        if (!this.rig) return;
+        this.rig.shoulder.rotation.z = pose.shoulder;
+        this.rig.elbow.rotation.z = pose.elbow;
+      },
+
+      poseBetween: function (t) {
+        return {
+          shoulder: lerp(POSE_HOME.shoulder, POSE_PICK.shoulder, t),
+          elbow: lerp(POSE_HOME.elbow, POSE_PICK.elbow, t)
+        };
+      },
+
+      /**
+       * Таспаға келесі қорапты шығару.
+       *
+       * Жеткізілген қорап науада қала береді, ал таспаға жаңасы келеді — бір
+       * ғана қорапты әрлі-берлі тасысақ, ол науадан таспаға секіріп кеткендей
+       * көрінер еді. Науада үшеу жиналған соң ең ескісі алынады: цехта дайын
+       * өнімді әкетіп тұрғаны сияқты.
+       */
+      spawnPart: function () {
+        var r = this.rig;
+        var box = new THREE.Mesh(r.partGeometry, r.partMaterial);
+        box.position.set(-1.15, 0.22, 0);
+        r.belt.add(box);
+        r.part = box;
+        r.carried = false;
+      },
+
+      deliverPart: function () {
+        var r = this.rig;
+        r.tray.attach(r.part);
+        r.part.position.set(0, 0.17, (r.delivered.length - 1) * 0.3 - 0.15);
+        r.part.rotation.set(0, 0, 0);
+        r.delivered.push(r.part);
+        if (r.delivered.length > 3) {
+          var oldest = r.delivered.shift();
+          r.tray.remove(oldest);
+        }
+        // Науадағы қораптарды қатарлап қою.
+        r.delivered.forEach(function (box, i) {
+          box.position.set(0, 0.17, i * 0.3 - 0.3);
         });
+        r.part = null;
+        r.carried = false;
+      },
+
+      /**
+       * Бір кадр. delta — миллисекунд. A-Frame оны өзі береді, ал тексеру
+       * кезінде қолмен де беруге болады.
+       */
+      tick: function (time, delta) {
+        var r = this.rig;
+        if (!r || !r.running) return;
+
+        r.clock = (r.clock + Math.min(delta || 16, 50) / 1000) % CYCLE;
+        var t = r.clock;
+
+        if (t < 1.2) {
+          // Конвейерге бұрылып, еңкею. Бұл кезде келесі қорап таспамен келеді.
+          //
+          // Жеткізілген қорап науада қалады, ал мұнда жаңасы шығады. Бұрын бір
+          // қорап әрлі-берлі тасылатын да, келесі айналымда қармауыш оны
+          // науадан іліп әкететін — қорап секіріп кеткендей көрінетіні содан.
+          r.turret.rotation.y = YAW_CONVEYOR;
+          this.applyPose(this.poseBetween(phase(t, 0.1, 1.2)));
+          if (!r.part) this.spawnPart();
+          r.part.position.x = lerp(-1.15, 0, phase(t, 0, 0.95));
+        } else if (t < 1.7) {
+          // Саусақтарды жабу және қорапты ұстау
+          this.applyPose(POSE_PICK);
+          var close = phase(t, 1.2, 1.6);
+          r.f1.position.x = lerp(-0.14, -0.08, close);
+          r.f2.position.x = lerp(0.14, 0.08, close);
+          if (!r.carried && t > 1.5) {
+            r.gripper.attach(r.part);
+            r.carried = true;
+          }
+        } else if (t < 2.3) {
+          // Көтеру
+          this.applyPose(this.poseBetween(1 - phase(t, 1.7, 2.3)));
+        } else if (t < 3.4) {
+          // Науаға қарай бұрылу
+          r.turret.rotation.y = lerp(YAW_CONVEYOR, YAW_TRAY, phase(t, 2.3, 3.4));
+        } else if (t < 4.0) {
+          // Науаның үстіне түсу
+          r.turret.rotation.y = YAW_TRAY;
+          this.applyPose(this.poseBetween(phase(t, 3.4, 4.0)));
+        } else if (t < 4.4) {
+          // Саусақтарды ашып, қорапты қою
+          this.applyPose(POSE_PICK);
+          var open = phase(t, 4.0, 4.3);
+          r.f1.position.x = lerp(-0.08, -0.14, open);
+          r.f2.position.x = lerp(0.08, 0.14, open);
+          if (r.carried && t > 4.15) this.deliverPart();
+        } else {
+          // Бастапқы қалыпқа оралу
+          this.applyPose(this.poseBetween(1 - phase(t, 4.4, 5.0)));
+        }
       }
     });
 
@@ -756,6 +1085,7 @@ function generateAFrameHTML(scenario: VRScenarioId): string {
 
   <a-scene
     embedded
+    studio-environment
     renderer="antialias: true; colorManagement: true; physicallyCorrectLights: true;"
     xr-mode-ui="enabled: true; enterAREnabled: true; enterVREnabled: true;"
     webxr="requiredFeatures: local-floor; optionalFeatures: bounded-floor, hand-tracking;"
@@ -787,9 +1117,12 @@ function generateAFrameHTML(scenario: VRScenarioId): string {
       ></a-entity>
     </a-entity>
 
-    <!-- Balanced Atmospheric Lighting -->
-    <a-entity light="type: ambient; color: #ffffff; intensity: 0.8;"></a-entity>
-    <a-entity light="type: directional; color: #ffffff; intensity: 1.5; position: 3 8 4;" castShadow="true"></a-entity>
+    <!-- Жарық: физикалық режимде қарқын шамасы басқаша есептеледі, сондықтан
+         бұрынғы мәндер зертхананы қараңғы етіп тұрған. Толықтырушы жарық
+         қарама-қарсы жақтан түсіп, көлеңкедегі бөлшектерді ашады. -->
+    <a-entity light="type: ambient; color: #cbd5e1; intensity: 1.6;"></a-entity>
+    <a-entity light="type: directional; color: #ffffff; intensity: 2.6; position: 3 8 4;" castShadow="true"></a-entity>
+    <a-entity light="type: directional; color: #93c5fd; intensity: 0.9; position: -4 3 -3;"></a-entity>
 
     ${
       scenario === "physics"
